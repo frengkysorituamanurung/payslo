@@ -1,0 +1,28 @@
+# Template: payment latency p99 via Envoy (lab, window pendek).
+# Diformulasikan sebagai rasio: request <= 500ms (bucket le="500") dibagi
+# semua request (bucket le="+Inf" menghitung tiap sampel tepat sekali).
+apiVersion: payslo/v1
+kind: SLO
+name: payment-latency-p99
+service: gateway-api
+description: Share of gateway requests served within 500ms (Envoy upstream).
+objective: 0.99
+window: 1h
+sli:
+  type: latency
+  source: metric
+  good: envoy_cluster_upstream_rq_time_bucket{envoy_cluster_name="gateway-api",le="500"}
+  total: envoy_cluster_upstream_rq_time_bucket{envoy_cluster_name="gateway-api",le="+Inf"}
+alerting:
+  runbook: runbooks/payment-latency.md
+  burnRates:
+    - longWindow: 15m
+      shortWindow: 5m
+      burnRate: 6
+      severity: page
+    - longWindow: 1h
+      shortWindow: 10m
+      burnRate: 2
+      severity: ticket
+targets:
+  - backend: prometheus

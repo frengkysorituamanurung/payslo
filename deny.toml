@@ -1,0 +1,71 @@
+# cargo-deny configuration (FASE 0).
+# Verified with: cargo-deny 0.20.2 + cargo 1.97.1 (deny.toml skema 0.20.x).
+# Docs: https://embarkstudios.github.io/cargo-deny/
+#
+# Bans enforced here (workspace-wide):
+# - openssl, openssl-sys, native-tls (AGENTS.md: wajib rustls, DILARANG OpenSSL/native-tls).
+# NOTE (FASE 1, docs/DECISIONS.md): `openssl-probe` is intentionally NOT banned.
+# It is a zero-dependency cert-path helper (no crypto linkage) pulled transitively
+# by reqwest 0.13 `rustls` -> rustls-platform-verifier. The real OpenSSL
+# implementations above stay banned.
+# Per-crate ban for gateway-api (prometheus, metrics, opentelemetry exporters) is enforced
+# via CI grep step (see .github/workflows/ci.yml job `ban-gateway-metrics`), because
+# cargo-deny bans are workspace-wide and P1 only forbids those crates in gateway-api.
+# See docs/DECISIONS.md.
+
+[graph]
+all-features = false
+no-default-features = false
+targets = []
+
+[licenses]
+allow = [
+    "Apache-2.0",
+    "MIT",
+    "MIT-0",
+    "Unicode-3.0",
+    "Unicode-DFS-2016",
+    "CC0-1.0",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "ISC",
+    "Zlib",
+    "CDLA-Permissive-2.0",
+]
+confidence-threshold = 0.8
+exceptions = []
+
+[licenses.private]
+ignore = false
+registries = []
+
+[bans]
+multiple-versions = "warn"
+wildcards = "deny"
+highlight = "all"
+workspace-default-features = "allow"
+external-default-features = "allow"
+deny = [
+    { crate = "openssl" },
+    { crate = "openssl-sys" },
+    { crate = "native-tls" },
+]
+skip = []
+skip-tree = []
+
+[advisories]
+db-path = "~/.cargo/advisory-dbs"
+db-urls = ["https://github.com/rustsec/advisory-db"]
+yanked = "warn"
+# RUSTSEC-2024-0449: unsafe-libyaml is unmaintained (archived, not vulnerable).
+# It is a thin binding to the battle-tested libyaml C library, pulled via
+# serde_yaml_ng (chosen because serde_yaml itself is archived — see
+# docs/DECISIONS.md). Risk accepted for the lab; revisit if a pure-Rust
+# serde-compatible YAML crate matures.
+ignore = ["RUSTSEC-2024-0449"]
+
+[sources]
+unknown-registry = "warn"
+unknown-git = "warn"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]
+allow-git = []

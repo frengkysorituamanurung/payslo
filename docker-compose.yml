@@ -1,0 +1,388 @@
+# PaySLO Lab — profiles: `default` (services below, no `profiles` key)
+# + `traffic` (loadgen) + `obs` (prometheus, alertmanager, sql-exporter, grafana)
+# + `obs-full` (loki, tempo, alloy) + `payslo` (payslo, datadog-mock, ntfy).
+# P4: every host port binds 127.0.0.1.
+# `make up-lite` = default+traffic+obs+payslo. `make up` = everything.
+
+name: payslo-lab
+
+networks:
+  lab:
+    driver: bridge
+
+volumes:
+  pgdata:
+  loki-data:
+  payslo-data:
+
+services:
+  postgres:
+    image: "postgres:16.6-alpine"
+    environment:
+      POSTGRES_USER: "${POSTGRES_USER:-lab_app}"
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:-lab-only-change-me}"
+      POSTGRES_DB: "${POSTGRES_DB:-payslo_lab}"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./db/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+      - ./db/seed.sql:/docker-entrypoint-initdb.d/02-seed.sql:ro
+    ports:
+      - "127.0.0.1:5432:5432"
+    networks: [lab]
+    mem_limit: 256m
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER:-lab_app} -d $${POSTGRES_DB:-payslo_lab}"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+
+  bank-bca:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: bank-sim
+    environment:
+      PROVIDER_NAME: bca
+      BANK_PORT: 4000
+      PROFILE: "${BANK_PROFILE:-normal}"
+      GATEWAY_URL: http://gateway-api:3000
+      SEED: "${SEED:-42}"
+      RUST_LOG: "${RUST_LOG:-bank_sim=info}"
+    ports:
+      - "127.0.0.1:4001:4000"
+    networks: [lab]
+    mem_limit: 64m
+    healthcheck:
+      test: ["CMD", "bank-sim", "--healthcheck"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 10s
+
+  bank-mandiri:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: bank-sim
+    environment:
+      PROVIDER_NAME: mandiri
+      BANK_PORT: 4000
+      PROFILE: "${BANK_PROFILE:-normal}"
+      GATEWAY_URL: http://gateway-api:3000
+      SEED: "${SEED:-42}"
+      RUST_LOG: "${RUST_LOG:-bank_sim=info}"
+    ports:
+      - "127.0.0.1:4002:4000"
+    networks: [lab]
+    mem_limit: 64m
+    healthcheck:
+      test: ["CMD", "bank-sim", "--healthcheck"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 10s
+
+  ewallet-sim:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: bank-sim
+    environment:
+      PROVIDER_NAME: ewallet
+      BANK_PORT: 4000
+      PROFILE: "${BANK_PROFILE:-normal}"
+      GATEWAY_URL: http://gateway-api:3000
+      SEED: "${SEED:-42}"
+      RUST_LOG: "${RUST_LOG:-bank_sim=info}"
+    ports:
+      - "127.0.0.1:4003:4000"
+    networks: [lab]
+    mem_limit: 64m
+    healthcheck:
+      test: ["CMD", "bank-sim", "--healthcheck"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 10s
+
+  merchant-sink:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: merchant-sink
+    environment:
+      MERCHANT_SINK_PORT: 5000
+      MERCHANT_WEBHOOK_SECRET: "${MERCHANT_WEBHOOK_SECRET:-lab-only-webhook-secret-change-me}"
+      RUST_LOG: "${RUST_LOG:-merchant_sink=info}"
+    ports:
+      - "127.0.0.1:5000:5000"
+    networks: [lab]
+    mem_limit: 64m
+    healthcheck:
+      test: ["CMD", "merchant-sink", "--healthcheck"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 10s
+
+  gateway-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: gateway-api
+    environment:
+      GATEWAY_PORT: 3000
+      # U0: listener admin loopback terpisah (Envoy memblokir /admin/* di edge).
+      GATEWAY_ADMIN_PORT: 3001
+      DATABASE_URL: "postgres://${POSTGRES_USER:-lab_app}:${POSTGRES_PASSWORD:-lab-only-change-me}@postgres:5432/${POSTGRES_DB:-payslo_lab}"
+      BANK_BCA_URL: http://bank-bca:4000
+      BANK_MANDIRI_URL: http://bank-mandiri:4000
+      EWALLET_URL: http://ewallet-sim:4000
+      MERCHANT_SINK_URL: http://merchant-sink:5000
+      MERCHANT_WEBHOOK_SECRET: "${MERCHANT_WEBHOOK_SECRET:-lab-only-webhook-secret-change-me}"
+      GATEWAY_TIMEOUT_SECS: "${GATEWAY_TIMEOUT_SECS:-5}"
+      GATEWAY_TXN_TTL_SECS: "${GATEWAY_TXN_TTL_SECS:-600}"
+      SEED: "${SEED:-42}"
+      RUST_LOG: "${RUST_LOG:-gateway_api=info}"
+    ports:
+      - "127.0.0.1:3000:3000"
+      # U0: admin gateway (loopback-only; tidak lewat Envoy).
+      - "127.0.0.1:3001:3001"
+    networks: [lab]
+    mem_limit: 128m
+    depends_on:
+      postgres:
+        condition: service_healthy
+      bank-bca:
+        condition: service_healthy
+      bank-mandiri:
+        condition: service_healthy
+      ewallet-sim:
+        condition: service_healthy
+      merchant-sink:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "gateway-api", "--healthcheck"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 15s
+
+  envoy:
+    image: "envoyproxy/envoy:v1.34.3"
+    command: ["envoy", "-c", "/etc/envoy/envoy.yaml"]
+    volumes:
+      - ./config/envoy/envoy.yaml:/etc/envoy/envoy.yaml:ro
+    ports:
+      - "127.0.0.1:8080:8080"
+      - "127.0.0.1:9901:9901"
+    networks: [lab]
+    mem_limit: 128m
+    depends_on:
+      gateway-api:
+        condition: service_healthy
+    # No healthcheck in FASE 1: envoyproxy/envoy has no shell/curl and the
+    # admin /ready endpoint needs an HTTP probe; added with obs tooling later.
+
+  loadgen:
+    image: "grafana/k6:0.57.0"
+    profiles: [traffic]
+    volumes:
+      - ./apps/loadgen:/scripts:ro
+    command: ["run", "/scripts/script.js"]
+    environment:
+      # Via Envoy (arsitektur: loadgen -> Envoy -> gateway) agar SLI Envoy
+      # (RPS, 5xx, p99) mencerminkan trafik nyata.
+      GATEWAY_URL: http://envoy:8080
+      RATE_PER_SEC: "${RATE_PER_SEC:-2}"
+    networks: [lab]
+    mem_limit: 128m
+    depends_on:
+      gateway-api:
+        condition: service_healthy
+
+  # ------------------------------------------------------- obs profile
+  prometheus:
+    image: "prom/prometheus:v3.3.1"
+    profiles: [obs]
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=7d
+      - --web.listen-address=0.0.0.0:9090
+      - --web.enable-lifecycle
+    volumes:
+      - ./config/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./payslo-workspace/generated:/etc/prometheus/payslo:ro
+    ports:
+      - "127.0.0.1:9090:9090"
+    networks: [lab]
+    mem_limit: 256m
+
+  alertmanager:
+    image: "prom/alertmanager:v0.28.1"
+    profiles: [obs]
+    command:
+      - --config.file=/etc/alertmanager/alertmanager.yml
+      - --storage.path=/alertmanager
+      - --web.listen-address=0.0.0.0:9093
+    volumes:
+      - ./config/alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+    ports:
+      - "127.0.0.1:9093:9093"
+    networks: [lab]
+    mem_limit: 64m
+
+  sql-exporter:
+    image: "burningalchemist/sql_exporter:0.24.9"
+    profiles: [obs]
+    command: ["--config.file=/etc/sql_exporter/sql_exporter.yml"]
+    volumes:
+      - ./config/sql_exporter/sql_exporter.yml:/etc/sql_exporter/sql_exporter.yml:ro
+    ports:
+      - "127.0.0.1:9399:9399"
+    networks: [lab]
+    mem_limit: 64m
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      # sql_exporter image is busybox-based, so wget exists.
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:9399/metrics"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 10s
+
+  grafana:
+    image: "grafana/grafana:11.6.1"
+    profiles: [obs]
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      # LAB-ONLY credential (synthetic lab).
+      GF_SECURITY_ADMIN_PASSWORD: "${GRAFANA_PASSWORD:-lab-only-grafana}"
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      # U0: dashboard Grafana ditanam via iframe di Lab Console
+      # (CSP frame-src http://127.0.0.1:3002). Tetap loopback-only.
+      GF_SECURITY_ALLOW_EMBEDDING: "true"
+    volumes:
+      - ./config/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./config/grafana/dashboards:/etc/grafana/dashboards:ro
+    ports:
+      # U0: pindah 3001 -> 3002; :3001 kini milik admin gateway-api.
+      - "127.0.0.1:3002:3000"
+    networks: [lab]
+    mem_limit: 256m
+    # No depends_on loki/tempo: they live in obs-full and may start later;
+    # Grafana tolerates down backends (queries fail until they are up).
+    depends_on:
+      - prometheus
+
+  # ------------------------------------------------------- obs-full profile
+  loki:
+    image: "grafana/loki:3.4.2"
+    profiles: [obs-full]
+    command: ["-config.file=/etc/loki/loki.yaml"]
+    volumes:
+      - ./config/loki/loki.yaml:/etc/loki/loki.yaml:ro
+      - loki-data:/loki
+    ports:
+      - "127.0.0.1:3100:3100"
+    networks: [lab]
+    mem_limit: 256m
+
+  tempo:
+    image: "grafana/tempo:2.7.1"
+    profiles: [obs-full]
+    command: ["-config.file=/etc/tempo/tempo.yaml"]
+    volumes:
+      - ./config/tempo/tempo.yaml:/etc/tempo/tempo.yaml:ro
+    # Ephemeral trace storage: image runs as uid 10001 and a named volume
+    # would be root-owned; tmpfs keeps non-root AND the lab fast.
+    tmpfs:
+      - /tmp/tempo:uid=10001,gid=10001,mode=0700
+    ports:
+      - "127.0.0.1:3200:3200"
+    networks: [lab]
+    # 384m: pernah exit 137 (SIGKILL) saat tekanan build paralel; total
+    # profil up-lite tetap <= ~2.5 GB (lihat README).
+    mem_limit: 384m
+
+  alloy:
+    image: "grafana/alloy:v1.7.3"
+    profiles: [obs-full]
+    command: ["run", "--server.http.listen-addr=127.0.0.1:12345", "/etc/alloy/config.alloy"]
+    volumes:
+      - ./config/alloy/config.alloy:/etc/alloy/config.alloy:ro
+      # WARNING (P4): docker.sock read-only, HANYA untuk Alloy (baca log container).
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks: [lab]
+    mem_limit: 128m
+    depends_on:
+      - loki
+
+  # ------------------------------------------------------- payslo profile
+  # Notifikasi lokal (lab-only): ntfy tanpa auth, hanya 127.0.0.1.
+  # PERINGATAN: jangan expose ke publik; tanpa auth siapa pun bisa publish.
+  ntfy:
+    image: "binwiederhier/ntfy:v2.30.0"
+    profiles: [payslo]
+    command: ["serve"]
+    ports:
+      - "127.0.0.1:8022:80"
+    networks: [lab]
+    mem_limit: 64m
+    # Tanpa healthcheck: image tidak menyediakan shell/curl/wget yang stabil
+    # untuk probe; kesiapan dicek via HTTP :8022 oleh smoke/lab.
+
+  payslo:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: payslo
+    profiles: [payslo]
+    command: ["serve"]
+    # NOTE: runs as root (lab-only) because the named data volume is
+    # root-owned and the image has no shell/user tooling to chown.
+    # The DB must live on a real Linux fs: bind-mounted SQLite shared with
+    # the macOS host (colima sshfs) corrupts ("malformed") — the server is
+    # the SOLE accessor; lab CLI reads via HTTP /incidents.
+    user: "0:0"
+    environment:
+      PAYSLO_PORT: 8081
+      PAYSLO_DB_PATH: /data/payslo.db
+      NTFY_URL: "http://ntfy:80"
+      NTFY_TOPIC: "${NTFY_TOPIC:-payslo-lab}"
+      RUST_LOG: "${RUST_LOG:-payslo_server=info}"
+    volumes:
+      - payslo-data:/data
+    ports:
+      - "127.0.0.1:8081:8081"
+    networks: [lab]
+    mem_limit: 128m
+    # No healthcheck: scratch image has no shell/wget/curl (see gateway-api
+    # --healthcheck pattern; payslo serve has no such subcommand yet).
+
+  datadog-mock:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: datadog-mock
+    profiles: [payslo]
+    environment:
+      DATADOG_MOCK_PORT: 8126
+      # LAB-ONLY credential (synthetic lab).
+      DD_API_KEY: "${DD_API_KEY:-lab-only-dd-api-key}"
+      RUST_LOG: "${RUST_LOG:-datadog_mock=info}"
+    ports:
+      - "127.0.0.1:8126:8126"
+    networks: [lab]
+    mem_limit: 64m
+    healthcheck:
+      test: ["CMD", "datadog-mock", "--healthcheck"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 10s

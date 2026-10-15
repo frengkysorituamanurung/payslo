@@ -1,0 +1,43 @@
+# Runbook TEREKSEKUSI untuk SLO payment-success-rate (U4).
+# Diformat YAML dan dijalankan lab serve (bukan payslo-runbook yang masih
+# skeleton): diagnostic boleh jalan kapan saja; remediation HANYA jalan
+# setelah approval tercatat di PaySLO (tak ada endpoint eksekusi langsung).
+# - promql: HANYA nama metric allowlist (lihat metricQueries di lab serve),
+#   bukan PromQL bebas dari browser. `provider: all` = fan-out per provider.
+# - http: HANYA GET ke loopback lab (divalidasi di kode).
+# - lab_routing: satu-satunya executor remediation (PUT /admin/routing
+#   gateway); impact WAJIB diisi dan requires_approval HARUS true.
+apiVersion: payslo/v1
+kind: Runbook
+name: payment-success-rate
+slo: payment-success-rate
+steps:
+  - name: success-rate per provider
+    kind: diagnostic
+    run:
+      type: promql
+      query: payment_success_ratio_by_provider
+      provider: all
+  - name: profil bank-bca
+    kind: diagnostic
+    run:
+      type: http
+      method: GET
+      url: http://127.0.0.1:4001/admin/profile
+  - name: routing gateway saat ini
+    kind: diagnostic
+    run:
+      type: http
+      method: GET
+      url: http://127.0.0.1:3001/admin/routing
+  - name: catat observasi
+    kind: manual
+    detail: Buka Provider Health di Grafana dan cocokkan dengan output diagnostik di atas.
+  - name: nonaktifkan provider bca
+    kind: remediation
+    requires_approval: true
+    impact: "Traffic VA dialihkan dari bca ke mandiri via PUT /admin/routing gateway (bca=false). Reversibel: enable kembali setelah bank pulih. Tidak memutus transaksi berjalan."
+    run:
+      type: lab_routing
+      disable:
+        - bca

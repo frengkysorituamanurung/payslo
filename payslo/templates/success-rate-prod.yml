@@ -1,0 +1,31 @@
+# CONTOH GAYA PRODUKSI (30d). Hanya untuk dibaca/di-render — TIDAK dites live
+# (trainee tidak menunggu berjam-jam; SLO lab memakai window pendek).
+apiVersion: payslo/v1
+kind: SLO
+name: payment-success-rate-prod
+service: gateway-api
+description: "Production-style example: 99.9% success over 30 days."
+objective: 0.999
+window: 30d
+sli:
+  type: success-ratio
+  source: metric
+  good: payment_transactions_total{status="SUCCESS"}
+  total: payment_transactions_total
+alerting:
+  runbook: runbooks/payment-success.md
+  burnRates:
+    - longWindow: 1h
+      shortWindow: 5m
+      burnRate: 14.4
+      severity: page
+    - longWindow: 6h
+      shortWindow: 30m
+      burnRate: 6
+      severity: page
+    - longWindow: 3d
+      shortWindow: 6h
+      burnRate: 1
+      severity: ticket
+targets:
+  - backend: prometheus

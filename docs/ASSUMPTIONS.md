@@ -1,0 +1,55 @@
+# ASSUMPTIONS — PaySLO Lab
+
+Hal yang belum terverifikasi penuh + cara memverifikasinya. Jangan mengarang;
+jika ragu, catat di sini (aturan AGENTS.MD no. 3).
+
+| # | Asumsi | Cara verifikasi | Status |
+|---|--------|-----------------|--------|
+| 1 | Toolchain Rust `1.97.1` tersedia via rustup dan mendukung edition 2024 | `rustc --version`, `cargo --version`; CI memakai `rust-toolchain.toml` yang sama | Terverifikasi lokal 2026-10-14 (rustc 1.97.1) |
+| 2 | `anyhow 1.0.104`, `thiserror 2.0.21` adalah versi nyata di crates.io | `cargo info anyhow`, `cargo info thiserror` (dilakukan 2026-10-14) | Terverifikasi |
+| 3 | Image FASE 1: rust:1.97.1-bookworm, postgres:16.6-alpine, envoyproxy/envoy:v1.34.3, grafana/k6:0.57.0, cargo-chef 0.1.78 | `docker manifest inspect <img>` + `cargo info cargo-chef` (dilakukan 2026-10-14) | Terverifikasi (FASE 1). Prometheus/dsb menyusul fase obs |
+| 4 | `datadog-mock` meniru subset API Datadog; field yang dipakai BELUM diverifikasi dari docs resmi | Baca https://docs.datadoghq.com/api/latest/ saat implementasi; catat field terverifikasi di sini | Terbuka |
+| 5 | `cargo-deny` dan `cargo-audit` versi CI — dipin via install action; definisi advisories mengikuti RustSec DB | Lihat `.github/workflows/ci.yml`; jalankan `make deny` lokal setelah `cargo install cargo-deny` | Terbuka (deny lokal FASE 0, lihat laporan) |
+
+| 6 | Datadog v1 API (docs.datadoghq.com, dibaca 2026-10-14): endpoint SLO/monitor + `DD-API-KEY`, SLO `type/metric/thresholds{target,timeframe,target_display}/timeframe{7d,30d,90d}/query{numerator,denominator}`, monitor `type/query/name/message/tags/options`, slo-alert `error_budget("<id>").over("<7d\|30d\|90d>") >= #` | Webfetch docs resmi saat FASE 4 | Terverifikasi (daftar ini). TIDAK terverifikasi: evaluasi query error_budget di mock (disimpan opaque), response delete persis (`deleted_id`/`deleted_monitor_id` = pilihan mock), isi `history` (sintetis) |
+
+| 7 | datadog-mock response shapes: SLO create/get = `{data:[...]}`, monitor create/get-one = objek langsung, monitor list = array langsung, SLO delete = `{data:{deleted_id}}`, monitor delete = `{deleted_monitor_id}` | Bentuk create/list SLO + monitor:create terverifikasi di docs; bentuk delete + history = pilihan mock (ditandai) | Mock-defined |
+
+| 8 | Webhook Datadog (mock): bentuk `{title,text,alert_type,priority,id,tags}` + mapping P1/P2->page, success->resolved adalah simplifikasi mock yang didokumentasikan di normalizer | Bentuk monitor webhook asli bervariasi; kontrak URL 5b (/approvals/..) ditetapkan dulu, diimplementasikan di 5b | Mock-defined |
+
+| 9 | ntfy `binwiederhier/ntfy:v2.30.0` multi-arch (amd64+arm64) | `docker manifest inspect` 2026-10-15 | Terverifikasi |
+| 10 | Ukuran image amd64 seorde dengan arm64 terukur (gateway 14.5 MB, bank 11.3 MB, sink 5.2 MB, payslo 19.3 MB, ddmock 5.4 MB) | Build multi-arch penuh hanya di CI (`docker` job) + `release.yml`; diverifikasi saat tag v0.1.0 pertama di-push | Terbuka (menunggu push tag) |
+| 11 | `make up-prebuilt` hijau dari clone bersih | Membutuhkan image GHCR hasil `release.yml`; terverifikasi setelah tag v0.1.0 di-push (registry default `ghcr.io/payslo-lab`; fork menimpa `PAYSLO_REGISTRY`) | Terbuka (menunggu push tag) |
+| 12 | Tidak ada remote git di lingkungan FASE 8 (commit/tag/isu GitHub belum bisa dibuat) | Buat remote, push, `git tag -s v0.1.0`, file-kan 10 isu dari `docs/GOOD_FIRST_ISSUES.md`, aktifkan label `good-first-issue` | Terbuka (aksi manusia) |
+
+| U0-1 | TypeScript 5.9.3 (bukan 7.x): `openapi-typescript@7.13.0` peer `typescript@^5.x`; TS 7.0.2 (Go-port) belum didukung ekosistem | `npm install` gagal eresolve TS 7 (2026-10-16); pin 5.9.3 = latest 5.x | Terverifikasi |
+| U0-2 | ESLint 9.39.5 (bukan 10.x): `eslint-plugin-jsx-a11y@6.10.2` peer `eslint@^3\|\|...\|\|^9`, menolak 10 | `npm install` gagal eresolve eslint 10 (2026-10-16); 9.39.5 = latest 9.x | Terverifikasi |
+| U0-3 | Validator OpenAPI = `@redocly/cli@2.64.0` (latest saat cek 2026-10-16); generator = `openapi-typescript@7.13.0` | `npm view` 2026-10-16 + `redocly lint` hijau | Terverifikasi |
+| U0-4 | Playwright memakai `@playwright/test@1.64.1` + `@axe-core/playwright@4.13.0`; browser chromium diunduh via `playwright install` | Cek saat `make ui-e2e` | Terbuka |
+| U0-5 | Font self-hosted = `@fontsource/inter@5.3.0` (lisensi OFL, sesuai syarat UI-SPEC) | `npm view` + LICENSE di paket (dicek saat build) | Terverifikasi (OFL, file LICENSE di paket) |
+
+| U1-1 | Envoy (live :9901/stats/prometheus): `envoy_http_downstream_rq_xx{envoy_response_code_class="2".."5", envoy_http_conn_manager_prefix="ingress"}` counter; histogram `envoy_http_downstream_rq_time_bucket{...,le="<ms>"}` (p99 via histogram_quantile); total `envoy_http_downstream_rq_total{...="ingress"}`. WAJIB filter prefix="ingress" (admin terpisah). `rate()` memicu warning "might not be a counter" tapi valid (counter Prometheus) | curl :9901 + query /api/v1/query 2026-10-16 | Terverifikasi |
+| U1-2 | sql_exporter (live :9399): `payment_transactions_total{channel,provider,status}` (status FINAL saja; PENDING bukan outcome); `payment_webhook_deliveries_total{status}` (hanya "DELIVERED" terlihat; FAILED mungkin absen = tidak ada gagal); `payment_transactions_pending` gauge bisa TANPA series (no_data, bukan 0) | curl :9399 2026-10-16 | Terverifikasi |
+| U1-3 | Prometheus scrape 5s (asumsi window rate 1m/5m valid; stale = titik terakhir > 15 dtk = 3x scrape) | config/prometheus/prometheus.yml | Terverifikasi |
+
+| U3-1 | Dep UI baru (pin eksak, `npm view` 2026-10-16): `@uiw/react-codemirror@4.25.12` (MIT), `@codemirror/lang-yaml@6.1.3` (MIT, pull view/state otomatis), `diff@9.0.0` (BSD-3-Clause) | `npm view <paket> version/license` + `npm ls` | Terverifikasi |
+| U3-2 | `npx @redocly/cli@2.64.0 lint api/openapi.yaml`: 23 error `security-defined` + 9 warning `operation-4xx-response` — PRA-ADA sejak U0 (spec tanpa definisi security; GET tanpa 4xx), bukan dari tambahan U3 | lint sebelum/sesudah diff spec (error sama di path lama) | Terverifikasi (pre-existing; gaya konsisten) |
+| U3-3 | `payslo plan` untuk koneksi datadog butuh `DD_API_KEY` + mock hidup; tanpa itu plan/drift/apply datadog gagal total (exit 1) — dibedakan dari "tak ada perubahan" via pesan error | `target/debug/payslo plan ...` tanpa/dengan `DD_API_KEY` 2026-10-16 | Terverifikasi |
+| U3-4 | Recording rule live: `payslo:slo_error_ratio:<slug_underscore>:<window>` (mis. `payment_success_rate:1h`); SLI = 1 − error_ratio; alert aktif dari `GET /api/v1/rules` grup `payslo-<name>` | Baca `payslo-adapter-prometheus/src/lib.rs` (`compile`/`render_native`) + query live :9090 | Terverifikasi |
+| U3-5 | Drift datadog = hash kanonik (bukan field-level): edit manual monitor/SLO terdeteksi sebagai `drift ... (backend differs|object missing)` TANPA menyebut field; store dihapus = drift buta | Baca `payslo-cli/src/main.rs` (`desired_state`/`actual_state`/drift) + uji live langkah 7 acceptance-u3 | Terverifikasi |
+| U3-6 | Browser menyisipkan U+00A0 untuk spasi ganda di contenteditable CodeMirror (terbukti e2e) → indentasi YAML rusak diam-diam; dinormalkan di klien, server tetap menolak NBSP | e2e debug `SAVED-...` + hexdump `\xa0` 2026-10-16 | Terverifikasi (temuan nyata) |
+
+| U4-1 | payslo-server: approval/notes/detail endpoint BARU di U4 (sebelumnya hanya janji 5b); migrasi 0002 menambah kolom `reason` (idempoten) | `cargo test -p payslo-server` (4 test approvals + 13 unit) 2026-10-16 | Terverifikasi |
+| U4-2 | Remediation E2E = `lab_routing` disable bca via gateway admin `:3001` (bukan via Envoy, sesuai pola U0); reversibel via enable | acceptance-u4.sh langkah 7+11 (routing bca=false lalu true) | Terverifikasi |
+| U4-3 | Burn alert lab 5m/1m menyala ~1-3 mnt setelah bank Down dengan loadgen 2/s; resolve sepadan setelah bank Normal | acceptance-u4.sh (poll 5 dtk, budget 8 mnt tiap arah) | Terverifikasi (diukur saat run) |
+| U4-4 | Toast/badge memakai snapshot query sekali-beku + SSE 5 dtk: id yang sudah ada saat load tak pernah di-toast; id baru di-toast bila SSE lebih cepat dari poll 10 dtk | e2e incidents (toast ≤15 dtk, badge ≤15 dtk) | Terverifikasi |
+| U4-5 | Payload alert dirender sebagai TEKS (React escape; `<pre>`/`<span>`, tanpa `dangerouslySetInnerHTML` di jalur insiden) | Vitest XSS (`<script>` literal terlihat, `document.querySelector('img')` null) | Terverifikasi |
+| U4-6 | Browser e2e = headless-shell-1248 (`@playwright/test@1.64.1`, `playwright install` mengunduhnya 2026-10-16); snapshot mission/map diregenerasi karena widget `<select>` native render beda vs 1243 (konten identik, terbukti diff piksel hanya area selects) | `ls Library/Caches/ms-playwright` (birth time) + analisis diff bbox | Terverifikasi (pemeliharaan golden file) |
+
+| U2-1 | `github.com/jackc/pgx/v5 v5.8.0` (driver Postgres satu-satunya untuk `lab serve`); modul butuh `go 1.24.0` | `cd cmd/lab && go list -m github.com/jackc/pgx/v5` (= v5.8.0); `go build`/`go test` hijau 2026-10-16 | Terverifikasi |
+| U2-2 | `bank-sim` GET `/status/{provider_ref}` -> `{provider, provider_ref, status}` (status = `CHARGED\|SUCCESS\|FAILED`); ref tak dikenal -> 404 | Baca apps/bank-sim/src/routes.rs (`status`) + test `charge_and_status`; live: GET :4001/status/<ref> | Terverifikasi |
+| U2-3 | gateway admin (127.0.0.1:3001) `GET/PUT /admin/routing` -> `{bca:{enabled,weight},mandiri:{...},ewallet:{...}}`; `PUT /admin/release` body `{version:"good"\|"bad"}` | apps/gateway-api/src/routes.rs (test `admin_routing_roundtrip`, `put_release`); live PUT + GET via lab serve | Terverifikasi |
+| U2-4 | gateway TIDAK menyimpan `traceparent`, jadi timeline transaksi tidak punya `trace_id` nyata -> `traceId: null` dan tautan trace kosong (jujur, bukan dikarang) | grep `traceparent` di apps/gateway-api (hanya diteruskan, tidak dipersist) | Terverifikasi (perilaku kode) |
+| U2-5 | Tautan log = Grafana Explore URL `{grafana}/explore?left=...` dengan datasource Loki (`LAB_LOKI_URL`/`LAB_LOKI_DS_NAME`); format query Explore diasumsikan stabil | Set `LAB_LOKI_URL` + `LAB_LOKI_DS_NAME`, buka tautan di /payments (obs-full nyala) | Terbuka (hanya dibuat bila env di-set; default null) |
+| U2-6 | Mode `--demo` menulis audit ke memori (bukan JSONL) dan menyajikan fixture pembayaran deterministik (`demoTime=demoBase 2026-10-16T07:00:00Z`) | cmd/lab/server.go (`auditPath` kosong saat demo) + ui e2e | Terverifikasi |
+

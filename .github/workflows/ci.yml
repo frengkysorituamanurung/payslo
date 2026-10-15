@@ -1,0 +1,195 @@
+name: ci
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  fmt:
+    name: fmt
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4.2.2
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.97.1
+          components: rustfmt
+      - run: cargo fmt --all -- --check
+
+  clippy:
+    name: clippy (-D warnings)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4.2.2
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.97.1
+          components: clippy
+      - uses: Swatinem/rust-cache@v2.7.3
+      - run: cargo clippy --workspace --all-targets -- -D warnings
+
+  test:
+    name: test
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4.2.2
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.97.1
+      - uses: Swatinem/rust-cache@v2.7.3
+      - run: cargo test --workspace
+
+  deny:
+    name: cargo-deny
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4.2.2
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.97.1
+      - uses: Swatinem/rust-cache@v2.7.3
+      - uses: EmbarkStudios/cargo-deny-action@v2.0.9
+
+  audit:
+    name: cargo-audit
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4.2.2
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.97.1
+      - uses: Swatinem/rust-cache@v2.7.3
+      - run: cargo install cargo-audit --version 0.22.2 --locked
+      - run: cargo audit
+
+  ban-gateway-metrics:
+    name: ban gateway metrics crates (P1)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4.2.2
+      - name: Fail if gateway-api depends on metrics crates
+        run: |
+          set -euo pipefail
+          # P1: forbid metrics *dependencies* and code usage, not doc mentions.
+          # 1) Cargo.toml must not name these crates as dependencies.
+          # 2) Rust sources must not `use`/refer to them as code (`::` paths).
+          if grep -niE '^\s*(prometheus|metrics|metrics-exporter-prometheus|opentelemetry)[ _-]' apps/gateway-api/Cargo.toml; then
+            echo "::error::gateway-api DILARANG bergantung pada crate prometheus/metrics/OTel (P1, Cargo.toml)"
+            exit 1
+          fi
+          if grep -RniE '(use |::)(prometheus|metrics|metrics_exporter_prometheus|opentelemetry)(::|;| |$)' apps/gateway-api/src/; then
+            echo "::error::gateway-api DILARANG memakai crate prometheus/metrics/OTel di kode (P1)"
+            exit 1
+          fi
+          # 3) Belt-and-braces: lockfile must not contain them via gateway-api.
+          if cargo tree -p gateway-api --prefix none 2>/dev/null | grep -Ei '^(prometheus|metrics|opentelemetry) '; then
+            echo "::error::gateway-api menarik crate metrics transitif (P1)"
+            exit 1
+          fi
+          echo "gateway-api metrics ban OK"
+
+  shellcheck:
+    name: shellcheck
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4.2.2
+      - name: Run shellcheck on tracked shell scripts
+        run: |
+          set -euo pipefail
+          files=$(git ls-files '*.sh')
+          if [ -z "$files" ]; then
+            echo "no shell scripts tracked; OK"
+            exit 0
+          fi
+          # yamllint: disable-line
+          echo "$files" | xargs shellcheck -S warning
+
+  gitleaks:
+    name: gitleaks
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4.2.2
+        with:
+          fetch-depth: 0
+      - uses: gitleaks/gitleaks-action@v2.3.9
+
+  docker:
+    name: docker build (multi-arch, no push)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4.2.2
+      - uses: docker/setup-qemu-action@v3.2.0
+      - uses: docker/setup-buildx-action@v3.8.0
+      - name: Build workspace image (no push)
+        uses: docker/build-push-action@v6.10.0
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: false
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  lab-scenario-01:
+    name: lab scenario 01 (PASS + FAIL)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4.2.2
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.97.1
+      - uses: Swatinem/rust-cache@v2.7.3
+      - name: Build lab CLI
+        run: cargo build -p lab
+      - name: Start stack (default+traffic+obs+payslo)
+        run: docker compose --profile traffic --profile obs --profile payslo up -d --build
+      - name: Wait for health
+        run: |
+          for _ in $(seq 1 60); do
+            if docker compose --profile traffic --profile obs --profile payslo ps --format '{{.State}}' | grep -qv running; then
+              sleep 10
+            else
+              break
+            fi
+          done
+          ./target/debug/lab status
+      - name: Scenario 01 PASS path (solver)
+        run: LAB_BIN=./target/debug/lab bash scenarios/01/solve.sh
+      - name: Teardown 01
+        run: ./target/debug/lab scenario stop 01
+      - name: Scenario 01 FAIL path (no action)
+        run: |
+          ./target/debug/lab scenario start 01 --force
+          sleep 300
+          ./target/debug/lab verify 01 && { echo "FAIL path unexpectedly passed"; exit 1; } || echo "FAIL path correctly rejected"
+          ./target/debug/lab scenario stop 01
+      - name: Dump compose status on failure
+        if: failure()
+        run: docker compose --profile traffic --profile obs --profile payslo ps; docker compose logs --tail 50 gateway-api payslo
+
+  smoke:
+    # FASE 8 release gate: full pipeline up-lite -> traffic -> apply SLO ->
+    # scenario 01 solver -> incident + ntfy + resolved -> down.
+    # Butuh ~75 mnt (solver 8 mnt + tunggu burn 1h reda ~55-60 mnt, empiris).
+    name: smoke (full pipeline, FASE 8)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4.2.2
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.97.1
+      - uses: Swatinem/rust-cache@v2.7.3
+      - name: Full smoke pipeline
+        run: bash scripts/smoke.sh
+      - name: "Idempotency: reset + up-lite kedua kali"
+        if: success()
+        run: |
+          make reset
+          sleep 30
+          make up-lite
+          docker compose --profile traffic --profile obs --profile payslo ps
+          make down
+      - name: Dump compose status on failure
+        if: failure()
+        run: docker compose --profile traffic --profile obs --profile payslo ps; docker compose logs --tail 50 gateway-api payslo alertmanager ntfy

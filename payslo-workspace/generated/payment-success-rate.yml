@@ -1,0 +1,89 @@
+groups:
+  - name: payslo-payment-success-rate
+    rules:
+      - record: payslo:slo_error_ratio:payment_success_rate:10m
+        expr: |
+          1 - (
+            sum(rate(payment_transactions_total{status="SUCCESS"}[10m]))
+            /
+            sum(rate(payment_transactions_total[10m]))
+          )
+      - record: payslo:slo_error_ratio:payment_success_rate:15m
+        expr: |
+          1 - (
+            sum(rate(payment_transactions_total{status="SUCCESS"}[15m]))
+            /
+            sum(rate(payment_transactions_total[15m]))
+          )
+      - record: payslo:slo_error_ratio:payment_success_rate:1h
+        expr: |
+          1 - (
+            sum(rate(payment_transactions_total{status="SUCCESS"}[1h]))
+            /
+            sum(rate(payment_transactions_total[1h]))
+          )
+      - record: payslo:slo_error_ratio:payment_success_rate:1m
+        expr: |
+          1 - (
+            sum(rate(payment_transactions_total{status="SUCCESS"}[1m]))
+            /
+            sum(rate(payment_transactions_total[1m]))
+          )
+      - record: payslo:slo_error_ratio:payment_success_rate:5m
+        expr: |
+          1 - (
+            sum(rate(payment_transactions_total{status="SUCCESS"}[5m]))
+            /
+            sum(rate(payment_transactions_total[5m]))
+          )
+      - alert: PaySLOBurnRateHigh
+        expr: |
+          (
+            payslo:slo_error_ratio:payment_success_rate:5m > 0.072
+            and
+            payslo:slo_error_ratio:payment_success_rate:1m > 0.072
+          )
+        for: 1m
+        labels:
+          slo: payment-success-rate
+          service: gateway-api
+          severity: page
+          window: "5m"
+        annotations:
+          summary: "SLO payment-success-rate burn rate high (5m over 1m)"
+          runbook_url: "runbooks/payment-success.md"
+          window: "5m"
+      - alert: PaySLOBurnRateHigh
+        expr: |
+          (
+            payslo:slo_error_ratio:payment_success_rate:15m > 0.03
+            and
+            payslo:slo_error_ratio:payment_success_rate:5m > 0.03
+          )
+        for: 5m
+        labels:
+          slo: payment-success-rate
+          service: gateway-api
+          severity: page
+          window: "15m"
+        annotations:
+          summary: "SLO payment-success-rate burn rate high (15m over 5m)"
+          runbook_url: "runbooks/payment-success.md"
+          window: "15m"
+      - alert: PaySLOBurnRateHigh
+        expr: |
+          (
+            payslo:slo_error_ratio:payment_success_rate:1h > 0.01
+            and
+            payslo:slo_error_ratio:payment_success_rate:10m > 0.01
+          )
+        for: 10m
+        labels:
+          slo: payment-success-rate
+          service: gateway-api
+          severity: ticket
+          window: "1h"
+        annotations:
+          summary: "SLO payment-success-rate burn rate high (1h over 10m)"
+          runbook_url: "runbooks/payment-success.md"
+          window: "1h"

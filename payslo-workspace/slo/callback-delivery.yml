@@ -1,0 +1,26 @@
+# Template: merchant webhook delivery (lab, window pendek).
+apiVersion: payslo/v1
+kind: SLO
+name: callback-delivery
+service: gateway-api
+description: Share of merchant webhook forwards delivered (after 3x retry).
+objective: 0.99
+window: 1h
+sli:
+  type: success-ratio
+  source: metric
+  good: payment_webhook_deliveries_total{status="DELIVERED"}
+  total: payment_webhook_deliveries_total
+alerting:
+  runbook: runbooks/callback-delivery.md
+  burnRates:
+    - longWindow: 15m
+      shortWindow: 5m
+      burnRate: 6
+      severity: ticket
+    - longWindow: 1h
+      shortWindow: 10m
+      burnRate: 2
+      severity: ticket
+targets:
+  - backend: prometheus

@@ -1,0 +1,43 @@
+id: "04"
+title: "DB lambat: lock eksklusif di transactions"
+brief: |
+  Tiba-tiba hampir semua request ke gateway timeout (504 dari Envoy) dan
+  health check database merah. Tidak ada perubahan kode yang di-deploy.
+  Tugasmu: identifikasi lapisan yang macet, bebaskan, dan jawab dua pertanyaan.
+questions:
+  - id: diagnosis
+    prompt: Lapisan apa yang macet dan apa buktinya (lock apa, di tabel apa)?
+  - id: fix
+    prompt: Bagaimana cara membebaskannya dan apa pencegahannya?
+setup:
+  - action: db_lock
+    secs: 300
+teardown:
+  - action: db_unlock
+checks:
+  - type: prometheus_query
+    query: sum(rate(envoy_http_downstream_rq_xx{envoy_http_conn_manager_prefix="ingress",envoy_response_code_class="5"}[2m])) / sum(rate(envoy_http_downstream_rq_completed{envoy_http_conn_manager_prefix="ingress"}[2m]))
+    operator: "<"
+    value: 0.05
+    points: 15
+  - type: sli_above
+    query: sum(rate(payment_transactions_total{status="SUCCESS"}[2m])) / sum(rate(payment_transactions_total[2m]))
+    threshold: 0.9
+    points: 10
+  - type: answer_contains
+    question: diagnosis
+    contains: lock
+    points: 15
+  - type: answer_contains
+    question: fix
+    contains: terminate
+    points: 10
+  - type: duration_lt
+    max_secs: 1800
+    soft: true
+scoring:
+  ttd_full_secs: 120
+  ttd_zero_secs: 600
+  ttm_full_secs: 300
+  ttm_zero_secs: 1500
+unsafe_actions: ["chaos:bank", "chaos:db", "chaos:merchant", "deploy:bad"]

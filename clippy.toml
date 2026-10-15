@@ -1,0 +1,4 @@
+# Clippy workspace config. Actual lints are enforced via [workspace.lints] in Cargo.toml.
+# This file holds style thresholds only.
+cognitive-complexity-threshold = 30
+too-many-arguments-threshold = 7

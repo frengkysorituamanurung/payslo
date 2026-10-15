@@ -1,0 +1,69 @@
+---
+source: payslo/crates/payslo-adapter-prometheus/tests/snapshots.rs
+expression: "render_template(\"callback-delivery.yml\")?"
+---
+groups:
+  - name: payslo-callback-delivery
+    rules:
+      - record: payslo:slo_error_ratio:callback_delivery:10m
+        expr: |
+          1 - (
+            sum(rate(payment_webhook_deliveries_total{status="DELIVERED"}[10m]))
+            /
+            sum(rate(payment_webhook_deliveries_total[10m]))
+          )
+      - record: payslo:slo_error_ratio:callback_delivery:15m
+        expr: |
+          1 - (
+            sum(rate(payment_webhook_deliveries_total{status="DELIVERED"}[15m]))
+            /
+            sum(rate(payment_webhook_deliveries_total[15m]))
+          )
+      - record: payslo:slo_error_ratio:callback_delivery:1h
+        expr: |
+          1 - (
+            sum(rate(payment_webhook_deliveries_total{status="DELIVERED"}[1h]))
+            /
+            sum(rate(payment_webhook_deliveries_total[1h]))
+          )
+      - record: payslo:slo_error_ratio:callback_delivery:5m
+        expr: |
+          1 - (
+            sum(rate(payment_webhook_deliveries_total{status="DELIVERED"}[5m]))
+            /
+            sum(rate(payment_webhook_deliveries_total[5m]))
+          )
+      - alert: PaySLOBurnRateHigh
+        expr: |
+          (
+            payslo:slo_error_ratio:callback_delivery:15m > 0.06
+            and
+            payslo:slo_error_ratio:callback_delivery:5m > 0.06
+          )
+        for: 5m
+        labels:
+          slo: callback-delivery
+          service: gateway-api
+          severity: ticket
+          window: "15m"
+        annotations:
+          summary: "SLO callback-delivery burn rate high (15m over 5m)"
+          runbook_url: "runbooks/callback-delivery.md"
+          window: "15m"
+      - alert: PaySLOBurnRateHigh
+        expr: |
+          (
+            payslo:slo_error_ratio:callback_delivery:1h > 0.02
+            and
+            payslo:slo_error_ratio:callback_delivery:10m > 0.02
+          )
+        for: 10m
+        labels:
+          slo: callback-delivery
+          service: gateway-api
+          severity: ticket
+          window: "1h"
+        annotations:
+          summary: "SLO callback-delivery burn rate high (1h over 10m)"
+          runbook_url: "runbooks/callback-delivery.md"
+          window: "1h"

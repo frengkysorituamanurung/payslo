@@ -1,0 +1,18 @@
+# Alertmanager (FASE 2). Route semua alert ke PaySLO (fase 3) via webhook.
+# PaySLO belum ada di FASE 2: delivery akan retry di Alertmanager, config tetap
+# valid dan alert tetap terlihat di UI Alertmanager :9093.
+global:
+  resolve_timeout: 1m
+
+route:
+  receiver: payslo
+  group_by: [slo, service]
+  group_wait: 10s
+  group_interval: 30s
+  repeat_interval: 5m
+
+receivers:
+  - name: payslo
+    webhook_configs:
+      - url: http://payslo:8081/webhooks/alertmanager
+        send_resolved: true

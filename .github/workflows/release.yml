@@ -1,0 +1,75 @@
+# Publikasi image ber-tag versi ke GHCR untuk jalur `make up-prebuilt`.
+#
+# Pemicu: push tag v* (mis. v0.1.0). Tag image = NAMA TAG GIT (vX.Y.Z),
+# DILARANG `latest` (aturan AGENTS.MD). Multi-arch linux/amd64+linux/arm64
+# (binary musl statis dari Dockerfile workspace).
+#
+# Image yang dipublikasikan (5 target, sesuai docker-compose.prebuilt.yml):
+#   <registry>/payslo-lab-gateway-api:<tag>
+#   <registry>/payslo-lab-bank-sim:<tag>       (dipakai 3 instance)
+#   <registry>/payslo-lab-merchant-sink:<tag>
+#   <registry>/payslo-lab-payslo:<tag>
+#   <registry>/payslo-lab-datadog-mock:<tag>
+# dengan registry = ghcr.io/<repository_owner_lowercase>.
+#
+# Trainee memakai default upstream tanpa perubahan hanya bila registry-nya
+# sama dengan default PAYSLO_REGISTRY di docker-compose.prebuilt.yml;
+# fork WAJIB menimpa: PAYSLO_REGISTRY=ghcr.io/<org-anda> make up-prebuilt
+# (lihat docs/VERSIONS.md).
+#
+# Provenance + SBOM attestations aktif (default build-push-action): setiap
+# image membawa attestation yang bisa dicek via `docker buildx imagetools`.
+
+name: release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  publish:
+    name: publish ${{ matrix.image }}:${{ github.ref_name }}
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - target: gateway-api
+            image: payslo-lab-gateway-api
+          - target: bank-sim
+            image: payslo-lab-bank-sim
+          - target: merchant-sink
+            image: payslo-lab-merchant-sink
+          - target: payslo
+            image: payslo-lab-payslo
+          - target: datadog-mock
+            image: payslo-lab-datadog-mock
+    steps:
+      - uses: actions/checkout@v4.2.2
+      - uses: docker/setup-qemu-action@v3.2.0
+      - uses: docker/setup-buildx-action@v3.8.0
+      - uses: docker/login-action@v3.3.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Lowercase owner for GHCR
+        id: owner
+        run: echo "value=${GITHUB_REPOSITORY_OWNER,,}" >> "$GITHUB_OUTPUT"
+      - name: Build + push (amd64+arm64)
+        uses: docker/build-push-action@v6.10.0
+        with:
+          context: .
+          target: ${{ matrix.target }}
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ghcr.io/${{ steps.owner.outputs.value }}/${{ matrix.image }}:${{ github.ref_name }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          provenance: true
+          sbom: true

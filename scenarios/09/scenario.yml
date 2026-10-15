@@ -1,0 +1,13 @@
+id: "09"
+title: "Game day (blind dispatcher)"
+brief: |
+  Skenario ini adalah dispatcher buta: seed menentukan skenario mana yang
+  dijalankan. Kamu tidak diberi tahu skenarionya di muka — deteksi seperti
+  insiden nyata, lalu selesaikan dan jawab sesuai skenario terpilih.
+  (Dispatcher ini hanya mengarahkan; isi skenario tetap milik 01-08.)
+questions: []
+setup: []
+teardown: []
+checks: []
+scoring: {}
+unsafe_actions: ["chaos:bank", "chaos:db", "chaos:merchant", "deploy:bad"]

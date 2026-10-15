@@ -1,0 +1,38 @@
+name: Bug report
+description: Laporkan kegagalan lab dengan output nyata (bukan parafrase).
+labels: [bug]
+body:
+  - type: input
+    id: command
+    attributes:
+      label: Perintah yang dijalankan
+      placeholder: "mis. make smoke"
+    validations:
+      required: true
+  - type: textarea
+    id: output
+    attributes:
+      label: Output nyata (tempel log, bukan parafrase)
+      render: shell
+    validations:
+      required: true
+  - type: input
+    id: versions
+    attributes:
+      label: Versi Docker / OS / arch
+      placeholder: "mis. Docker 29.5.2, macOS arm64, tag v0.1.0"
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Langkah reproduksi minimal
+    validations:
+      required: true
+  - type: checkboxes
+    id: safety
+    attributes:
+      label: Keamanan lab
+      options:
+        - label: Tidak ada data/secret asli yang ditempel di laporan ini
+          required: true

@@ -1,0 +1,35 @@
+name: Feature request
+description: Usulkan fitur di luar spesifikasi (akan dicatat di BACKLOG bila diterima).
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Masalah trainee/mentor yang diselesaikan
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposal (opsi paling sederhana dulu)
+    validations:
+      required: true
+  - type: dropdown
+    id: scope
+    attributes:
+      label: Scope fase/komponen
+      options:
+        - lab CLI / skenario
+        - PaySLO (model/adapter/server/runbook)
+        - gateway / bank-sim / merchant-sink
+        - observability (prom/grafana/loki/tempo)
+        - docs / kurikulum
+        - build / CI / rilis
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria (perintah verifikasi + output yang diharapkan)
+    validations:
+      required: true

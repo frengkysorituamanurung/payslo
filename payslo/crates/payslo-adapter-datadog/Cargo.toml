@@ -1,0 +1,25 @@
+[package]
+name = "payslo-adapter-datadog"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+async-trait = { workspace = true }
+payslo-adapter = { version = "0.1.0", path = "../payslo-adapter" }
+payslo-model = { version = "0.1.0", path = "../payslo-model" }
+rand = { workspace = true }
+reqwest = { workspace = true }
+serde_json = { workspace = true }
+tokio = { workspace = true }
+
+[dev-dependencies]
+async-trait = { workspace = true }
+axum = { workspace = true }
+datadog-mock = { version = "0.1.0", path = "../../../apps/datadog-mock" }
+payslo-testkit = { version = "0.1.0", path = "../payslo-testkit" }
+tokio = { workspace = true }
+
+[lints]
+workspace = true

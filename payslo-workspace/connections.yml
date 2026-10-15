@@ -1,0 +1,11 @@
+connections:
+  - name: prometheus-local
+    backend: prometheus
+    out_dir: payslo-workspace/generated
+    reload_url: http://127.0.0.1:9090
+  - name: datadog-mock
+    backend: datadog
+    endpoint: http://127.0.0.1:8126
+    # secret_ref: API key dari env (atau file). Nilai lab-only, bukan rahasia asli.
+    api_key:
+      env: DD_API_KEY

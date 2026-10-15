@@ -1,0 +1,11 @@
+# Redocly lint config untuk api/openapi.yaml.
+# Aturan yang dimatikan (dengan alasan):
+# - security-defined: API U0 hanya GET tanpa skema auth OpenAPI; keamanan
+#   loopback (bind 127.0.0.1 + Host allowlist) dan X-Lab-Token untuk mutasi
+#   ditegakkan di middleware Go (diuji), bukan di kontrak OpenAPI.
+# - operation-4xx-response: endpoint GET U0 tidak punya respons 4xx yang jujur
+#   (404/422 akan ditambahkan bersama endpoint yang membutuhkannya di fase
+#   berikutnya, contract-first).
+rules:
+  security-defined: off
+  operation-4xx-response: off

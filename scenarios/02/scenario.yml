@@ -1,0 +1,49 @@
+id: "02"
+title: "Stuck pending: callback terlambat + ambiguous"
+brief: |
+  Transaksi menumpuk di status PENDING jauh lebih lama dari biasanya dan
+  sebagian respons gateway 503 padahal pembayarannya sukses. Tugasmu:
+  temukan bank mana yang berperilaku aneh, jelaskan mekanismenya, pulihkan,
+  dan jawab dua pertanyaan.
+questions:
+  - id: diagnosis
+    prompt: Bank apa yang berperilaku aneh dan bagaimana mekanismenya (profil? delay?)?
+  - id: fix
+    prompt: Apa mitigasi yang kamu lakukan dan mengapa aman?
+setup:
+  - action: bank_profile
+    provider: mandiri
+    profile: late-callback
+    callback_delay_s: 300
+  - action: bank_profile
+    provider: bca
+    profile: ambiguous
+teardown:
+  - action: bank_reset
+    provider: mandiri
+  - action: bank_reset
+    provider: bca
+  - action: bank_reset
+    provider: ewallet
+checks:
+  - type: sli_above
+    query: sum(rate(payment_transactions_total{status="SUCCESS"}[2m])) / sum(rate(payment_transactions_total[2m]))
+    threshold: 0.9
+    points: 15
+  - type: answer_contains
+    question: diagnosis
+    contains: late-callback
+    points: 15
+  - type: answer_contains
+    question: fix
+    contains: reset
+    points: 10
+  - type: duration_lt
+    max_secs: 2400
+    soft: true
+scoring:
+  ttd_full_secs: 180
+  ttd_zero_secs: 900
+  ttm_full_secs: 600
+  ttm_zero_secs: 2400
+unsafe_actions: ["chaos:bank", "chaos:db", "chaos:merchant", "deploy:bad"]

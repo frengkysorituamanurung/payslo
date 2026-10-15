@@ -1,0 +1,41 @@
+id: "03"
+title: "Callback duplikat: saldo merchant ganda"
+brief: |
+  Rekonsiliasi menemukan saldo merchant untuk beberapa order bernilai DUA KALI
+  lipat dari nominal pembayaran. Pembayaran di gateway tercatat sukses normal.
+  Tugasmu: buktikan dari mana penggandaan berasal, hentikan, dan jawab dua
+  pertanyaan.
+questions:
+  - id: diagnosis
+    prompt: Dari mana penggandaan berasal? Mekanisme duplikatnya bagaimana?
+  - id: fix
+    prompt: Mitigasi apa yang kamu lakukan dan apa perbaikan permanennya?
+setup:
+  - action: bank_profile
+    provider: ewallet
+    profile: dup-callback
+teardown:
+  - action: bank_reset
+    provider: ewallet
+checks:
+  - type: sli_above
+    query: sum(rate(payment_transactions_total{status="SUCCESS"}[2m])) / sum(rate(payment_transactions_total[2m]))
+    threshold: 0.9
+    points: 10
+  - type: answer_contains
+    question: diagnosis
+    contains: duplikat
+    points: 15
+  - type: answer_contains
+    question: fix
+    contains: reset
+    points: 10
+  - type: duration_lt
+    max_secs: 1800
+    soft: true
+scoring:
+  ttd_full_secs: 180
+  ttd_zero_secs: 900
+  ttm_full_secs: 600
+  ttm_zero_secs: 2400
+unsafe_actions: ["chaos:bank", "chaos:db", "chaos:merchant", "deploy:bad"]

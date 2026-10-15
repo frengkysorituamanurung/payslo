@@ -1,0 +1,61 @@
+id: "01"
+title: "VA timeout: bank-bca down"
+brief: |
+  Pelanggan VA mengeluh pembayaran macet. Dasbor menunjukkan anomali pada
+  salah satu provider. Tugasmu: deteksi provider mana yang bermasalah,
+  mitigasi agar transaksi kembali lancar, lalu jawab dua pertanyaan diagnosis.
+questions:
+  - id: diagnosis
+    prompt: Provider apa yang bermasalah dan apa buktinya (metrik/log apa)?
+  - id: divergence
+    prompt: Mengapa rasio HTTP 2xx tetap tinggi sementara payment success anjlok?
+setup:
+  - action: gateway_ttl
+    secs: 60
+  - action: bank_profile
+    provider: bca
+    profile: down
+teardown:
+  - action: bank_reset
+    provider: bca
+  - action: bank_reset
+    provider: mandiri
+  - action: bank_reset
+    provider: ewallet
+  - action: routing
+    provider: bca
+    enabled: true
+  - action: routing
+    provider: mandiri
+    enabled: true
+  - action: gateway_ttl
+    secs: 600
+checks:
+  - type: incident_exists
+    slo: payment-success-rate
+    points: 10
+  - type: routing_state
+    provider: bca
+    enabled: false
+    points: 15
+  - type: sli_above
+    query: sum(rate(payment_transactions_total{status="SUCCESS"}[2m])) / sum(rate(payment_transactions_total[2m]))
+    threshold: 0.9
+    points: 10
+  - type: answer_contains
+    question: diagnosis
+    contains: bca
+    points: 15
+  - type: answer_contains
+    question: divergence
+    contains: "200"
+    points: 10
+  - type: duration_lt
+    max_secs: 1800
+    soft: true
+scoring:
+  ttd_full_secs: 120
+  ttd_zero_secs: 600
+  ttm_full_secs: 300
+  ttm_zero_secs: 1500
+unsafe_actions: ["chaos:bank", "chaos:db", "chaos:merchant", "deploy:bad"]

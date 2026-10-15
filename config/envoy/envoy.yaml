@@ -1,0 +1,110 @@
+# Envoy ingress (FASE 2): :8080 -> gateway-api:3000, admin :9901,
+# JSON access log to stdout (Alloy -> Loki), OTLP tracing to Tempo.
+# P4: no docker.sock mount here (only Alloy gets :ro, in a later phase).
+static_resources:
+  listeners:
+    - name: ingress
+      address:
+        socket_address:
+          address: 0.0.0.0
+          port_value: 8080
+      filter_chains:
+        - filters:
+            - name: envoy.filters.network.http_connection_manager
+              typed_config:
+                "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+                stat_prefix: ingress
+                access_log:
+                  - name: envoy.access_loggers.stdout
+                    typed_config:
+                      "@type": type.googleapis.com/envoy.extensions.access_loggers.stream.v3.StdoutAccessLog
+                      log_format:
+                        json_format:
+                          timestamp: "%START_TIME%"
+                          method: "%REQ(:METHOD)%"
+                          path: "%REQ(X-ENVOY-ORIGINAL-PATH?:PATH)%"
+                          response_code: "%RESPONSE_CODE%"
+                          response_flags: "%RESPONSE_FLAGS%"
+                          duration_ms: "%DURATION%"
+                          upstream_ms: "%RESP(X-ENVOY-UPSTREAM-SERVICE-TIME)%"
+                          bytes_received: "%BYTES_RECEIVED%"
+                          bytes_sent: "%BYTES_SENT%"
+                          trace_id: "%REQ(TRACEPARENT)%"
+                          x_request_id: "%REQ(X-REQUEST-ID)%"
+                tracing:
+                  overall_sampling:
+                    value: 100
+                  provider:
+                    name: envoy.tracers.opentelemetry
+                    typed_config:
+                      "@type": type.googleapis.com/envoy.config.trace.v3.OpenTelemetryConfig
+                      grpc_service:
+                        envoy_grpc:
+                          cluster_name: tempo-otlp
+                      service_name: envoy-ingress
+                route_config:
+                  name: gateway_route
+                  virtual_hosts:
+                    - name: gateway
+                      domains: ["*"]
+                      routes:
+                        # U0: /admin/* TIDAK PERNAH diteruskan ke gateway.
+                        # Admin hanya via 127.0.0.1:3001 langsung (loopback).
+                        - match:
+                            prefix: /admin/
+                          direct_response:
+                            status: 403
+                            body:
+                              inline_string: "forbidden: admin not exposed via Envoy\n"
+                        - match:
+                            path: /admin
+                          direct_response:
+                            status: 403
+                            body:
+                              inline_string: "forbidden: admin not exposed via Envoy\n"
+                        - match:
+                            prefix: /
+                          route:
+                            cluster: gateway-api
+                            timeout: 10s
+                http_filters:
+                  - name: envoy.filters.http.router
+                    typed_config:
+                      "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+  clusters:
+    - name: gateway-api
+      connect_timeout: 2s
+      type: STRICT_DNS
+      lb_policy: ROUND_ROBIN
+      load_assignment:
+        cluster_name: gateway-api
+        endpoints:
+          - lb_endpoints:
+              - endpoint:
+                  address:
+                    socket_address:
+                      address: gateway-api
+                      port_value: 3000
+    - name: tempo-otlp
+      connect_timeout: 2s
+      type: STRICT_DNS
+      lb_policy: ROUND_ROBIN
+      typed_extension_protocol_options:
+        envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
+          "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+          explicit_http_config:
+            http2_protocol_options: {}
+      load_assignment:
+        cluster_name: tempo-otlp
+        endpoints:
+          - lb_endpoints:
+              - endpoint:
+                  address:
+                    socket_address:
+                      address: tempo
+                      port_value: 4317
+admin:
+  address:
+    socket_address:
+      address: 0.0.0.0
+      port_value: 9901

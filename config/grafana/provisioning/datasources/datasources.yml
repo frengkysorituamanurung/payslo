@@ -1,0 +1,29 @@
+# Grafana datasources (FASE 2). Tempo -> Loki link untuk trace->log.
+apiVersion: 1
+
+datasources:
+  - name: Prometheus
+    uid: PROM
+    type: prometheus
+    access: proxy
+    url: http://prometheus:9090
+    isDefault: true
+  - name: Loki
+    uid: LOKI
+    type: loki
+    access: proxy
+    url: http://loki:3100
+  - name: Tempo
+    uid: TEMPO
+    type: tempo
+    access: proxy
+    url: http://tempo:3200
+    jsonData:
+      tracesToLogsV2:
+        datasourceUid: LOKI
+        filterByTraceID: true
+        filterBySpanID: false
+        customQuery: true
+        query: '{service="gateway-api"} |= "${__trace.traceId}"'
+      tracesToMetrics:
+        datasourceUid: PROM

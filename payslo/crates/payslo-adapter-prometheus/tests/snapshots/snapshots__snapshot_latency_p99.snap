@@ -1,0 +1,69 @@
+---
+source: payslo/crates/payslo-adapter-prometheus/tests/snapshots.rs
+expression: "render_template(\"latency-p99.yml\")?"
+---
+groups:
+  - name: payslo-payment-latency-p99
+    rules:
+      - record: payslo:slo_error_ratio:payment_latency_p99:10m
+        expr: |
+          1 - (
+            sum(rate(envoy_cluster_upstream_rq_time_bucket{envoy_cluster_name="gateway-api",le="500"}[10m]))
+            /
+            sum(rate(envoy_cluster_upstream_rq_time_bucket{envoy_cluster_name="gateway-api",le="+Inf"}[10m]))
+          )
+      - record: payslo:slo_error_ratio:payment_latency_p99:15m
+        expr: |
+          1 - (
+            sum(rate(envoy_cluster_upstream_rq_time_bucket{envoy_cluster_name="gateway-api",le="500"}[15m]))
+            /
+            sum(rate(envoy_cluster_upstream_rq_time_bucket{envoy_cluster_name="gateway-api",le="+Inf"}[15m]))
+          )
+      - record: payslo:slo_error_ratio:payment_latency_p99:1h
+        expr: |
+          1 - (
+            sum(rate(envoy_cluster_upstream_rq_time_bucket{envoy_cluster_name="gateway-api",le="500"}[1h]))
+            /
+            sum(rate(envoy_cluster_upstream_rq_time_bucket{envoy_cluster_name="gateway-api",le="+Inf"}[1h]))
+          )
+      - record: payslo:slo_error_ratio:payment_latency_p99:5m
+        expr: |
+          1 - (
+            sum(rate(envoy_cluster_upstream_rq_time_bucket{envoy_cluster_name="gateway-api",le="500"}[5m]))
+            /
+            sum(rate(envoy_cluster_upstream_rq_time_bucket{envoy_cluster_name="gateway-api",le="+Inf"}[5m]))
+          )
+      - alert: PaySLOBurnRateHigh
+        expr: |
+          (
+            payslo:slo_error_ratio:payment_latency_p99:15m > 0.06
+            and
+            payslo:slo_error_ratio:payment_latency_p99:5m > 0.06
+          )
+        for: 5m
+        labels:
+          slo: payment-latency-p99
+          service: gateway-api
+          severity: page
+          window: "15m"
+        annotations:
+          summary: "SLO payment-latency-p99 burn rate high (15m over 5m)"
+          runbook_url: "runbooks/payment-latency.md"
+          window: "15m"
+      - alert: PaySLOBurnRateHigh
+        expr: |
+          (
+            payslo:slo_error_ratio:payment_latency_p99:1h > 0.02
+            and
+            payslo:slo_error_ratio:payment_latency_p99:10m > 0.02
+          )
+        for: 10m
+        labels:
+          slo: payment-latency-p99
+          service: gateway-api
+          severity: ticket
+          window: "1h"
+        annotations:
+          summary: "SLO payment-latency-p99 burn rate high (1h over 10m)"
+          runbook_url: "runbooks/payment-latency.md"
+          window: "1h"

@@ -1,0 +1,56 @@
+// Alloy (FASE 2, profil obs-full): kumpulkan log stdout semua container
+// Docker via API + teruskan ke Loki dengan label service + container.
+// WARNING (P4): docker.sock di-mount read-only (:ro) dan HANYA untuk Alloy.
+discovery.docker "lab" {
+  host = "unix:///var/run/docker.sock"
+}
+
+discovery.relabel "containers" {
+  targets = discovery.docker.lab.targets
+
+  // Only this lab's containers: the Docker host may run other projects.
+  rule {
+    action        = "keep"
+    source_labels = ["__meta_docker_container_label_com_docker_compose_project"]
+    regex         = "payslo-lab"
+  }
+
+  rule {
+    source_labels = ["__meta_docker_container_name"]
+    target_label  = "container"
+  }
+
+  rule {
+    source_labels = ["__meta_docker_container_label_com_docker_compose_service"]
+    target_label  = "service"
+  }
+}
+
+loki.source.docker "logs" {
+  host    = "unix:///var/run/docker.sock"
+  targets = discovery.relabel.containers.output
+  forward_to = [loki.write.lab.receiver]
+}
+
+loki.write "lab" {
+  endpoint {
+    url = "http://loki:3100/loki/api/v1/push"
+  }
+}
+
+
+
+
+
+
+curl 'http://localhost:8080/finance/transaction/pendingtask' \
+-H 'Content-Type: application/json' \
+-d '{
+    "transactionId": [
+        1142352545
+    ],
+    "reCheckAggregator": true,
+    "countryAlpha2": "ID"
+}'
+
+

@@ -1,0 +1,74 @@
+[workspace]
+members = [
+    "crates/lab",
+    "apps/gateway-api",
+    "apps/bank-sim",
+    "apps/merchant-sink",
+    "apps/datadog-mock",
+    "payslo/crates/payslo-model",
+    "payslo/crates/payslo-adapter",
+    "payslo/crates/payslo-adapter-prometheus",
+    "payslo/crates/payslo-adapter-datadog",
+    "payslo/crates/payslo-testkit",
+    "payslo/crates/payslo-runbook",
+    "payslo/crates/payslo-server",
+    "payslo/crates/payslo-cli",
+]
+resolver = "2"
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.97.1"
+license = "Apache-2.0"
+
+[workspace.dependencies]
+# Fondasi error-handling (terverifikasi via `cargo info` 2026-10-14).
+anyhow = "1.0.104"
+thiserror = "2.0.21"
+# FASE 1 (terverifikasi via `cargo info` / docs.rs, lihat docs/DECISIONS.md):
+axum = "0.8.9"
+hex = "0.4.3"
+hmac = "0.13.0"
+rand = "0.10.3"
+rand_chacha = "0.10.0"
+reqwest = { version = "0.13.5", default-features = false, features = ["json", "rustls", "query"] }
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.154"
+sha2 = "0.11.1"
+# sqlx WITHOUT `migrate`/`macros`/`uuid`/`time`: any feature referencing
+# `sqlx-sqlite?/*` makes resolution fail when rusqlite (libsqlite3-sys 0.38)
+# shares the graph with sqlx-sqlite's libsqlite3-sys 0.3x (links="sqlite3"
+# conflict). DB boundary uses String for UUID/timestamps instead; migrations
+# use a minimal embedded runner (apps/gateway-api/src/migrate.rs).
+# See docs/DECISIONS.md.
+sqlx = { version = "0.9.0", default-features = false, features = ["postgres", "runtime-tokio", "tls-rustls"] }
+subtle = "2.6.1"
+time = { version = "0.3.55", features = ["parsing", "formatting", "serde"] }
+tokio = { version = "1.53.3", features = ["macros", "rt-multi-thread", "signal", "time", "net", "sync"] }
+tracing = "0.1.44"
+tracing-subscriber = { version = "0.3.23", features = ["env-filter", "fmt", "json"] }
+uuid = { version = "1.28.0", features = ["v4", "serde"] }
+# FASE 3 (terverifikasi 2026-10-14; serde_yaml_ng dipilih karena serde_yaml
+# di-archive — lihat docs/DECISIONS.md):
+async-trait = "0.1.92"
+clap = { version = "4.6.7", features = ["derive"] }
+clap_complete = "4.6.11"
+insta = "1.49.0"
+jsonschema = "0.58.6"
+serde_yaml_ng = "0.10.0"
+# FASE 4 (terverifikasi 2026-10-14):
+rusqlite = { version = "0.40.2", features = ["bundled"] }
+
+[workspace.lints.rust]
+unsafe_code = "forbid"
+
+[workspace.lints.clippy]
+unwrap_used = "deny"
+expect_used = "deny"
+panic = "deny"
+
+[profile.release]
+opt-level = 2
+lto = "thin"
+strip = true

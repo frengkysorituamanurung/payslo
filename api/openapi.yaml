@@ -1,0 +1,2004 @@
+# PaySLO Lab Console API — U4 (contract-first).
+# Cakupan: U0 session/stack; U1 metrics/events; U2 payments/kontrol/audit;
+# U3 SLO; U4 insiden/approval/runbook/postmortem/pengaturan. Endpoint lain
+# (chaos, skenario, mentor) ditambahkan di fase UI berikutnya dengan
+# mengubah file ini DULU.
+openapi: 3.1.0
+info:
+  title: PaySLO Lab Console API
+  version: 0.5.0
+  license:
+    name: Apache-2.0
+  description: >-
+    API lokal untuk Lab Console (lab serve, 127.0.0.1:8088). Semua uang integer
+    IDR. Error memakai RFC 9457 (application/problem+json).
+servers:
+  - url: http://127.0.0.1:8088
+    description: lab serve lokal
+paths:
+  /api/v1/session:
+    get:
+      operationId: getSession
+      summary: Status sesi lab (mode, skenario aktif, stack up/belum)
+      responses:
+        '200':
+          description: Sesi saat ini
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Session'
+              examples:
+                traineeIdle:
+                  value:
+                    mode: trainee
+                    traineeName: null
+                    scenario: null
+                    labUp: true
+                    checkedAt: '2026-10-16T07:00:00Z'
+                mentorActive:
+                  value:
+                    mode: mentor
+                    traineeName: 'Sinta'
+                    scenario:
+                      id: '01'
+                      title: 'VA timeout: bank-bca down'
+                      startedAt: '2026-10-16T06:52:00Z'
+                      elapsedSecs: 480
+                    labUp: true
+                    checkedAt: '2026-10-16T07:00:00Z'
+        '500':
+          $ref: '#/components/responses/Problem'
+  /api/v1/health/stack:
+    get:
+      operationId: getStackHealth
+      summary: Kesehatan tiap service compose (untuk onboarding lab-belum-up)
+      responses:
+        '200':
+          description: Status stack
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StackHealth'
+              examples:
+                up:
+                  value:
+                    labUp: true
+                    checkedAt: '2026-10-16T07:00:00Z'
+                    services:
+                      - name: postgres
+                        state: up
+                      - name: gateway-api
+                        state: up
+                      - name: envoy
+                        state: degraded
+                        detail: admin tanpa healthcheck
+                down:
+                  value:
+                    labUp: false
+                    checkedAt: '2026-10-16T07:00:00Z'
+                    services: []
+        '500':
+          $ref: '#/components/responses/Problem'
+  /api/v1/metrics/summary:
+    get:
+      operationId: getMetricsSummary
+      summary: Ringkasan metric bernama (satu nilai per nama + semantik data)
+      parameters:
+        - $ref: '#/components/parameters/WindowParam'
+        - $ref: '#/components/parameters/DemoParam'
+      responses:
+        '200':
+          description: Ringkasan metric
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MetricsSummary'
+              examples:
+                ok:
+                  value:
+                    checkedAt: '2026-10-16T07:00:00Z'
+                    window: 5m
+                    metrics:
+                      http_2xx_ratio:
+                        status: ok
+                        value: 0.998
+                        sampleRate: 2.1
+                        lastDataAt: '2026-10-16T06:59:58Z'
+                      payment_success_ratio:
+                        status: ok
+                        value: 0.983
+                        sampleRate: 1.9
+                        lastDataAt: '2026-10-16T06:59:55Z'
+        '400':
+          $ref: '#/components/responses/Problem'
+        '500':
+          $ref: '#/components/responses/Problem'
+  /api/v1/metrics/series:
+    get:
+      operationId: getMetricsSeries
+      summary: Deret waktu satu metric bernama (grafik + tabel alternatif)
+      parameters:
+        - name: name
+          in: query
+          required: true
+          schema:
+            $ref: '#/components/schemas/MetricName'
+        - name: provider
+          in: query
+          schema:
+            $ref: '#/components/schemas/ProviderName'
+          description: Wajib bila name=payment_success_ratio_by_provider.
+        - $ref: '#/components/parameters/WindowParam'
+        - name: step
+          in: query
+          schema:
+            type: string
+            enum: [5s, 15s, 1m]
+            default: 15s
+        - $ref: '#/components/parameters/DemoParam'
+      responses:
+        '200':
+          description: Deret waktu (titik hilang = null, bukan 0)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MetricsSeries'
+        '400':
+          $ref: '#/components/responses/Problem'
+        '500':
+          $ref: '#/components/responses/Problem'
+  /api/v1/events:
+    get:
+      operationId: streamEvents
+      summary: SSE realtime (health + metrics); klien fallback polling bila putus
+      parameters:
+        - $ref: '#/components/parameters/DemoParam'
+      responses:
+        '200':
+          description: text/event-stream; event bernama health|metrics + komentar ping
+          content:
+            text/event-stream:
+              schema:
+                type: string
+                example: "event: health\ndata: {\"labUp\":true}\n\n"
+  /api/v1/payments:
+    get:
+      operationId: listPayments
+      summary: Daftar transaksi (Postgres lab_ro, paginasi kursor, filter)
+      description: >-
+        Dibaca lewat role Postgres `lab_ro` (SELECT saja). Bila DB tak
+        terjangkau, `dataStatus=source_down` dan `items` kosong (bukan 500).
+      parameters:
+        - $ref: '#/components/parameters/StatusParam'
+        - $ref: '#/components/parameters/ProviderParam'
+        - $ref: '#/components/parameters/ChannelParam'
+        - $ref: '#/components/parameters/LimitParam'
+        - $ref: '#/components/parameters/CursorParam'
+        - $ref: '#/components/parameters/DemoParam'
+      responses:
+        '200':
+          description: Satu halaman transaksi (terbaru dulu)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentList'
+              examples:
+                ok:
+                  value:
+                    checkedAt: '2026-10-16T07:00:00Z'
+                    dataStatus: ok
+                    hasMore: false
+                    nextCursor: null
+                    items:
+                      - id: '018f0a2e-1c3d-7a4b-8e5f-000000000001'
+                        merchantId: merchant-demo
+                        orderId: demo-order-1
+                        channel: VA
+                        provider: bca
+                        amount: 150000
+                        fee: 4000
+                        status: PENDING
+                        providerRef: P-BCA-0001
+                        createdAt: '2026-10-16T06:59:00Z'
+                        updatedAt: '2026-10-16T06:59:01Z'
+                        expiresAt: '2026-10-16T07:09:00Z'
+                        callbackCount: 0
+                        webhookDelivered: false
+                        duplicateCallback: false
+        '400':
+          $ref: '#/components/responses/Problem'
+    post:
+      operationId: createPayment
+      summary: Kirim pembayaran uji (diteruskan ke gateway via Envoy)
+      description: >-
+        Validasi bentuk + rentang amount (integer IDR, 1..1000000000000)
+        dilakukan di server SEBELUM memanggil gateway. HTTP 201 berarti
+        diterima (P2), BUKAN sukses; status final tetap PENDING/FAILED dari bank.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreatePaymentRequest'
+      responses:
+        '201':
+          description: Diterima gateway (status PENDING/FAILED; P2)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentSummary'
+        '400':
+          $ref: '#/components/responses/Problem'
+        '502':
+          $ref: '#/components/responses/Problem'
+        '504':
+          $ref: '#/components/responses/Problem'
+  /api/v1/payments/{id}:
+    get:
+      operationId: getPayment
+      summary: Detail transaksi + timeline (transactions, callback_log, webhook_delivery)
+      parameters:
+        - $ref: '#/components/parameters/PaymentIdParam'
+      responses:
+        '200':
+          description: Detail + timeline (waktu nyata; langkah antara bisa derived)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentDetail'
+        '404':
+          $ref: '#/components/responses/Problem'
+        '503':
+          $ref: '#/components/responses/Problem'
+  /api/v1/payments/{id}/bank-status:
+    get:
+      operationId: getPaymentBankStatus
+      summary: Cek status "ke bank" (GET bank-sim /status/{provider_ref})
+      parameters:
+        - $ref: '#/components/parameters/PaymentIdParam'
+      responses:
+        '200':
+          description: Status versi bank-sim
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BankStatus'
+        '404':
+          $ref: '#/components/responses/Problem'
+        '409':
+          $ref: '#/components/responses/Problem'
+        '502':
+          $ref: '#/components/responses/Problem'
+  /api/v1/traffic:
+    get:
+      operationId: getTraffic
+      summary: Laju loadgen saat ini (dibaca dari env kontainer loadgen)
+      parameters:
+        - $ref: '#/components/parameters/DemoParam'
+      responses:
+        '200':
+          description: Laju saat ini (null + source=unknown bila tak terbaca)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TrafficState'
+    put:
+      operationId: setTraffic
+      summary: Ubah laju loadgen (docker compose up -d loadgen)
+      description: 'Mutasi: wajib Origin UI + X-Lab-Token; tercatat di audit.'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TrafficState'
+      responses:
+        '200':
+          description: Laju baru
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TrafficState'
+        '400':
+          $ref: '#/components/responses/Problem'
+        '502':
+          $ref: '#/components/responses/Problem'
+  /api/v1/routing:
+    get:
+      operationId: getRouting
+      summary: Routing provider gateway (via admin loopback /admin/routing)
+      responses:
+        '200':
+          description: Tabel routing
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RoutingConfig'
+        '502':
+          $ref: '#/components/responses/Problem'
+    put:
+      operationId: setRouting
+      summary: Ganti tabel routing gateway (enable/disable + bobot)
+      description: 'Mutasi: wajib Origin UI + X-Lab-Token; tercatat di audit.'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RoutingConfig'
+      responses:
+        '200':
+          description: Routing tersimpan
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RoutingConfig'
+        '400':
+          $ref: '#/components/responses/Problem'
+        '502':
+          $ref: '#/components/responses/Problem'
+  /api/v1/release:
+    put:
+      operationId: setRelease
+      summary: Set versi rilis gateway (good|bad) untuk skenario regresi deploy
+      description: 'Mutasi: wajib Origin UI + X-Lab-Token; tercatat di audit.'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReleaseState'
+      responses:
+        '200':
+          description: Versi rilis tersimpan
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReleaseState'
+        '400':
+          $ref: '#/components/responses/Problem'
+        '502':
+          $ref: '#/components/responses/Problem'
+  /api/v1/audit:
+    get:
+      operationId: listAudit
+      summary: Audit log mutasi lab serve (aktor, aksi, target, waktu)
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 200
+            default: 50
+      responses:
+        '200':
+          description: Audit terbaru dulu
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuditList'
+  /api/v1/slos:
+    get:
+      operationId: listSlos
+      summary: Daftar SLO dari payslo-workspace/slo (*.yml/*.yaml)
+      description: >-
+        Dibaca dari direktori slo workspace. Berkas yang tak terparse tetap
+        dicantumkan dengan `parseError` (jujur, bukan disembunyikan).
+      responses:
+        '200':
+          description: Daftar SLO + waktu cek
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SloList'
+        '503':
+          $ref: '#/components/responses/Problem'
+  /api/v1/slos/{name}:
+    get:
+      operationId: getSlo
+      summary: Detail SLO (spesifikasi, deployment per backend, SLI live, budget, alert aktif)
+      parameters:
+        - $ref: '#/components/parameters/SloNameParam'
+      responses:
+        '200':
+          description: Detail SLO
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SloDetail'
+        '404':
+          $ref: '#/components/responses/Problem'
+        '503':
+          $ref: '#/components/responses/Problem'
+    put:
+      operationId: saveSlo
+      summary: Simpan berkas SLO (editor; hanya di payslo-workspace/slo/)
+      description: >-
+        Mutasi: wajib Origin UI + X-Lab-Token; tercatat di audit. Nama dibatasi
+        slug/basename .yml/.yaml (traversal ditolak), ukuran maks 64 KiB.
+      parameters:
+        - $ref: '#/components/parameters/SloNameParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SloFilePut'
+      responses:
+        '200':
+          description: Berkas tersimpan
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SloFileInfo'
+        '400':
+          $ref: '#/components/responses/Problem'
+        '404':
+          $ref: '#/components/responses/Problem'
+        '503':
+          $ref: '#/components/responses/Problem'
+  /api/v1/slos/{name}/validate:
+    post:
+      operationId: validateSlo
+      summary: Validasi SLO (error berlokasi baris/kolom)
+      description: >-
+        Body opsional {content}: bila ada, validasi draf tanpa menyimpan;
+        bila kosong, validasi berkas tersimpan. Selalu 200 dengan
+        {valid, errors} (bukan 4xx untuk konten tak valid).
+      parameters:
+        - $ref: '#/components/parameters/SloNameParam'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SloValidateRequest'
+      responses:
+        '200':
+          description: Hasil validasi
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SloValidation'
+        '400':
+          $ref: '#/components/responses/Problem'
+        '404':
+          $ref: '#/components/responses/Problem'
+        '503':
+          $ref: '#/components/responses/Problem'
+  /api/v1/slos/{name}/plan:
+    post:
+      operationId: planSlo
+      summary: Rencana perubahan per koneksi (diff untuk backend prometheus)
+      description: >-
+        Membungkus `payslo plan`. Untuk koneksi prometheus menyertakan
+        desired/actual/diff; untuk datadog hanya flag perubahan + catatan
+        (diff teks tak tersedia via CLI). Mutasi: wajib Origin + X-Lab-Token
+        (tidak mengubah backend, tapi menjalankan subprocess).
+      parameters:
+        - $ref: '#/components/parameters/SloNameParam'
+      responses:
+        '200':
+          description: Rencana perubahan
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SloPlan'
+        '400':
+          $ref: '#/components/responses/Problem'
+        '404':
+          $ref: '#/components/responses/Problem'
+        '502':
+          $ref: '#/components/responses/Problem'
+  /api/v1/slos/{name}/apply:
+    post:
+      operationId: applySlo
+      summary: Terapkan SLO ke backend (idempoten; apply kedua = no-op)
+      description: >-
+        Membungkus `payslo apply`. Filter koneksi opsional via
+        {connections}. Hasil per koneksi memuat applied/noOp; no-op
+        ditampilkan jelas di UI. Tercatat di audit.
+      parameters:
+        - $ref: '#/components/parameters/SloNameParam'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SloApplyRequest'
+      responses:
+        '200':
+          description: Hasil apply per koneksi
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SloApply'
+        '400':
+          $ref: '#/components/responses/Problem'
+        '404':
+          $ref: '#/components/responses/Problem'
+        '502':
+          $ref: '#/components/responses/Problem'
+  /api/v1/drift:
+    get:
+      operationId: getDrift
+      summary: Drift backend vs apply terakhir (membungkus `payslo drift`)
+      description: >-
+        Mencakup SEMUA SLO di workspace (perilaku `payslo drift`: membaca
+        direktori slo, bukan satu berkas).
+      responses:
+        '200':
+          description: Daftar drift (kosong = bersih)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SloDrift'
+        '502':
+          $ref: '#/components/responses/Problem'
+  /api/v1/capabilities:
+    get:
+      operationId: getCapabilities
+      summary: Matriks kapabilitas backend (membungkus `payslo capabilities`)
+      responses:
+        '200':
+          description: Matriks fitur prometheus vs datadog
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CapabilityMatrix'
+        '502':
+          $ref: '#/components/responses/Problem'
+  /api/v1/incidents:
+    get:
+      operationId: listIncidents
+      summary: Daftar insiden dari payslo-server (filter status/slo/service)
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [open, acknowledged, resolved]
+        - name: slo
+          in: query
+          schema:
+            type: string
+        - name: service
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Daftar insiden terbaru dulu
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IncidentList'
+        '400':
+          $ref: '#/components/responses/Problem'
+        '502':
+          $ref: '#/components/responses/Problem'
+  /api/v1/incidents/{id}:
+    get:
+      operationId: getIncident
+      summary: Detail insiden (timeline, alert terkorelasi, runbook, approvals)
+      description: >-
+        Semua data tak tepercaya (payload alert, catatan) dirender sebagai
+        teks oleh UI; tidak ada HTML yang dieksekusi.
+      parameters:
+        - $ref: '#/components/parameters/IncidentIdParam'
+      responses:
+        '200':
+          description: Detail insiden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IncidentDetail'
+        '404':
+          $ref: '#/components/responses/Problem'
+        '502':
+          $ref: '#/components/responses/Problem'
+  /api/v1/incidents/{id}/notes:
+    post:
+      operationId: addIncidentNote
+      summary: Tambah catatan manual ke timeline insiden (aktor = X-Lab-Actor)
+      description: 'Mutasi: wajib Origin UI + X-Lab-Token; tercatat di audit.'
+      parameters:
+        - $ref: '#/components/parameters/IncidentIdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/IncidentNotePut'
+      responses:
+        '201':
+          description: Catatan tersimpan
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok, incident_id]
+                additionalProperties: false
+                properties:
+                  ok:
+                    type: boolean
+                  incident_id:
+                    type: string
+        '400':
+          $ref: '#/components/responses/Problem'
+        '404':
+          $ref: '#/components/responses/Problem'
+  /api/v1/incidents/{id}/approvals:
+    get:
+      operationId: listIncidentApprovals
+      summary: Approval untuk satu insiden (filter status opsional)
+      parameters:
+        - $ref: '#/components/parameters/IncidentIdParam'
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [pending, approved, rejected, expired]
+      responses:
+        '200':
+          description: Daftar approval
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApprovalList'
+        '400':
+          $ref: '#/components/responses/Problem'
+        '404':
+          $ref: '#/components/responses/Problem'
+    post:
+      operationId: requestApproval
+      summary: Minta approval untuk langkah remediation runbook
+      description: >-
+        Aksi HARUS sama dengan langkah remediation di runbook (aksi bebas
+        ditolak 400). Idempoten: request pending yang sama dikembalikan
+        dengan deduped=true. Tercatat di audit.
+      parameters:
+        - $ref: '#/components/parameters/IncidentIdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApprovalRequestPut'
+      responses:
+        '201':
+          description: Approval dibuat (atau didedup)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApprovalEnvelope'
+        '400':
+          $ref: '#/components/responses/Problem'
+        '404':
+          $ref: '#/components/responses/Problem'
+        '409':
+          $ref: '#/components/responses/Problem'
+  /api/v1/incidents/{id}/runbook/steps/{idx}/run:
+    post:
+      operationId: runDiagnosticStep
+      summary: Jalankan SATU langkah diagnostic (output segar)
+      description: >-
+        Remediation -> 409 (wajib lewat approval PaySLO; tak ada jalan
+        pintas); manual -> 400.
+      parameters:
+        - $ref: '#/components/parameters/IncidentIdParam'
+        - name: idx
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 0
+      responses:
+        '200':
+          description: Output langkah
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StepOutput'
+        '400':
+          $ref: '#/components/responses/Problem'
+        '404':
+          $ref: '#/components/responses/Problem'
+        '409':
+          $ref: '#/components/responses/Problem'
+  /api/v1/incidents/{id}/postmortem:
+    get:
+      operationId: getPostmortem
+      summary: Draf postmortem + Markdown render server-side
+      parameters:
+        - $ref: '#/components/parameters/IncidentIdParam'
+      responses:
+        '200':
+          description: Postmortem (exists=false bila belum pernah disimpan)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Postmortem'
+        '404':
+          $ref: '#/components/responses/Problem'
+    put:
+      operationId: savePostmortem
+      summary: Simpan postmortem (draft/published); tercatat di audit
+      parameters:
+        - $ref: '#/components/parameters/IncidentIdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PostmortemPut'
+      responses:
+        '200':
+          description: Postmortem tersimpan (dengan markdown ter-render)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Postmortem'
+        '400':
+          $ref: '#/components/responses/Problem'
+        '404':
+          $ref: '#/components/responses/Problem'
+  /api/v1/approvals:
+    get:
+      operationId: listApprovals
+      summary: Antrean approval global (filter status, untuk badge + SSE)
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [pending, approved, rejected, expired]
+      responses:
+        '200':
+          description: Daftar approval
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApprovalList'
+        '400':
+          $ref: '#/components/responses/Problem'
+        '502':
+          $ref: '#/components/responses/Problem'
+  /api/v1/approvals/{aid}/decision:
+    post:
+      operationId: decideApproval
+      summary: Rekam keputusan approval ke PaySLO (identitas dari pengaturan)
+      description: >-
+        Approved -> lab serve mengeksekusi remediation lalu mencatat hasilnya
+        di timeline. Keputusan ganda -> 409; reject tanpa reason -> 422.
+        Tercatat di audit.
+      parameters:
+        - name: aid
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApprovalDecisionPut'
+      responses:
+        '200':
+          description: Approval terputus
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApprovalEnvelope'
+        '400':
+          $ref: '#/components/responses/Problem'
+        '404':
+          $ref: '#/components/responses/Problem'
+        '409':
+          $ref: '#/components/responses/Problem'
+        '422':
+          $ref: '#/components/responses/Problem'
+        '502':
+          $ref: '#/components/responses/Problem'
+  /api/v1/settings:
+    get:
+      operationId: getSettings
+      summary: Pengaturan console (nama trainee untuk identitas approver)
+      responses:
+        '200':
+          description: Pengaturan saat ini
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LabSettings'
+    put:
+      operationId: setSettings
+      summary: Simpan pengaturan; tercatat di audit
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LabSettings'
+      responses:
+        '200':
+          description: Pengaturan tersimpan
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LabSettings'
+        '400':
+          $ref: '#/components/responses/Problem'
+components:
+  parameters:
+    WindowParam:
+      name: window
+      in: query
+      schema:
+        type: string
+        enum: [1m, 5m, 15m, 1h]
+        default: 5m
+    DemoParam:
+      name: demo
+      in: query
+      description: Hanya mode --demo (healthy|bca_down|prom_down|empty|stale|payments). Mode live + param ini = 400.
+      schema:
+        $ref: '#/components/schemas/DemoScenario'
+    PaymentIdParam:
+      name: id
+      in: path
+      required: true
+      description: UUID transaksi
+      schema:
+        type: string
+        format: uuid
+    StatusParam:
+      name: status
+      in: query
+      schema:
+        $ref: '#/components/schemas/PaymentStatus'
+    ProviderParam:
+      name: provider
+      in: query
+      schema:
+        $ref: '#/components/schemas/ProviderName'
+    ChannelParam:
+      name: channel
+      in: query
+      schema:
+        $ref: '#/components/schemas/PaymentChannel'
+    LimitParam:
+      name: limit
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 25
+    CursorParam:
+      name: cursor
+      in: query
+      description: 'Kursor opaque dari respons sebelumnya (keyset created_at+id).'
+      schema:
+        type: string
+    SloNameParam:
+      name: name
+      in: path
+      required: true
+      description: Nama SLO (slug a-z0-9-, mis. payment-success-rate)
+      schema:
+        type: string
+        pattern: '^[a-z0-9]([a-z0-9-]*[a-z0-9])?$'
+    IncidentIdParam:
+      name: id
+      in: path
+      required: true
+      description: ID insiden PaySLO (inc-<hex>)
+      schema:
+        type: string
+  schemas:
+    SessionMode:
+      type: string
+      enum: [trainee, mentor]
+      example: trainee
+    ScenarioRef:
+      type: object
+      required: [id, title, startedAt, elapsedSecs]
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+          example: '01'
+        title:
+          type: string
+          example: 'VA timeout: bank-bca down'
+        startedAt:
+          type: string
+          format: date-time
+        elapsedSecs:
+          type: integer
+          minimum: 0
+    Session:
+      type: object
+      required: [mode, traineeName, scenario, labUp, checkedAt]
+      additionalProperties: false
+      properties:
+        mode:
+          $ref: '#/components/schemas/SessionMode'
+        traineeName:
+          type: ['string', 'null']
+        scenario:
+          anyOf:
+            - $ref: '#/components/schemas/ScenarioRef'
+            - type: 'null'
+        labUp:
+          type: boolean
+        checkedAt:
+          type: string
+          format: date-time
+    ServiceState:
+      type: string
+      enum: [up, down, degraded, unknown]
+    ServiceHealth:
+      type: object
+      required: [name, state]
+      additionalProperties: false
+      properties:
+        name:
+          type: string
+          example: gateway-api
+        state:
+          $ref: '#/components/schemas/ServiceState'
+        detail:
+          type: string
+    StackHealth:
+      type: object
+      required: [labUp, services, checkedAt]
+      additionalProperties: false
+      properties:
+        labUp:
+          type: boolean
+          description: false = tampilkan onboarding "lab belum up" + CopyCommand make up-lite
+        services:
+          type: array
+          items:
+            $ref: '#/components/schemas/ServiceHealth'
+        checkedAt:
+          type: string
+          format: date-time
+    DataStatus:
+      type: string
+      description: Semantik data U1 (U1 di UI-SPEC). ok=segar; no_data=vektor kosong (bukan 0); stale=titik terakhir > 15 dtk; source_down=Prometheus tak terjangkau.
+      enum: [ok, no_data, stale, source_down]
+    MetricName:
+      type: string
+      enum: [http_rps, http_2xx_ratio, http_5xx_ratio, http_p99_ms, payment_rps, payment_success_ratio, payment_success_ratio_by_provider, payment_pending_stuck, webhook_delivery_ratio]
+    ProviderName:
+      type: string
+      enum: [bca, mandiri, ewallet]
+    DemoScenario:
+      type: string
+      enum: [healthy, bca_down, prom_down, empty, stale, payments]
+    MetricValue:
+      type: object
+      required: [status, value, sampleRate, lastDataAt]
+      additionalProperties: false
+      properties:
+        status:
+          $ref: '#/components/schemas/DataStatus'
+        value:
+          type: ['number', 'null']
+          description: null bila status bukan ok (jangan tampilkan 0)
+        sampleRate:
+          type: ['number', 'null']
+          description: Laju sampel per detik (untuk ambang data-sedikit 0.2/s di UI)
+        lastDataAt:
+          type: ['string', 'null']
+          format: date-time
+        detail:
+          type: string
+    MetricsSummary:
+      type: object
+      required: [checkedAt, window, metrics]
+      additionalProperties: false
+      properties:
+        checkedAt:
+          type: string
+          format: date-time
+        window:
+          type: string
+          example: 5m
+        metrics:
+          type: object
+          additionalProperties:
+            $ref: '#/components/schemas/MetricValue'
+    SeriesPoint:
+      type: array
+      prefixItems:
+        - type: string
+          format: date-time
+          description: Waktu titik
+        - type: ['number', 'null']
+          description: Nilai; null = gap (jangan diinterpolasi diam-diam)
+      minItems: 2
+      maxItems: 2
+    MetricsSeries:
+      type: object
+      required: [name, step, status, lastDataAt, points]
+      additionalProperties: false
+      properties:
+        name:
+          $ref: '#/components/schemas/MetricName'
+        step:
+          type: string
+          example: 15s
+        status:
+          $ref: '#/components/schemas/DataStatus'
+        lastDataAt:
+          type: ['string', 'null']
+          format: date-time
+        points:
+          type: array
+          items:
+            $ref: '#/components/schemas/SeriesPoint'
+    FieldError:
+      type: object
+      required: [field, message]
+      additionalProperties: false
+      properties:
+        field:
+          type: string
+          example: amount
+        message:
+          type: string
+          example: 'amount harus integer IDR antara 1 dan 1000000000000'
+    PaymentChannel:
+      type: string
+      enum: [VA, EWALLET, QRIS]
+    PaymentStatus:
+      type: string
+      enum: [CREATED, PENDING, SUCCESS, FAILED, EXPIRED]
+    CreatePaymentRequest:
+      type: object
+      required: [merchantId, orderId, amount, channel]
+      additionalProperties: false
+      properties:
+        merchantId:
+          type: string
+          minLength: 1
+          example: merchant-demo
+        orderId:
+          type: string
+          minLength: 1
+          example: demo-order-1
+        amount:
+          type: integer
+          minimum: 1
+          maximum: 1000000000000
+          description: Integer IDR (tanpa pecahan). DILARANG float (U6/P7).
+        channel:
+          $ref: '#/components/schemas/PaymentChannel'
+    PaymentSummary:
+      type: object
+      required:
+        - id
+        - merchantId
+        - orderId
+        - channel
+        - provider
+        - amount
+        - fee
+        - status
+        - providerRef
+        - createdAt
+        - updatedAt
+        - expiresAt
+        - callbackCount
+        - webhookDelivered
+        - duplicateCallback
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+          format: uuid
+        merchantId:
+          type: string
+        orderId:
+          type: string
+        channel:
+          $ref: '#/components/schemas/PaymentChannel'
+        provider:
+          $ref: '#/components/schemas/ProviderName'
+        amount:
+          type: integer
+          description: Integer IDR (tanpa pecahan)
+        fee:
+          type: integer
+        status:
+          $ref: '#/components/schemas/PaymentStatus'
+        providerRef:
+          type: ['string', 'null']
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        expiresAt:
+          type: string
+          format: date-time
+        callbackCount:
+          type: integer
+          minimum: 0
+        webhookDelivered:
+          type: boolean
+        duplicateCallback:
+          type: boolean
+          description: callbackCount > 1 (indikasi duplikat; netral, tanpa sebab)
+    PaymentEventType:
+      type: string
+      enum: [created, pending, callback, webhook, final]
+    PaymentEvent:
+      type: object
+      required: [type, at, derived]
+      additionalProperties: false
+      properties:
+        type:
+          $ref: '#/components/schemas/PaymentEventType'
+        at:
+          type: ['string', 'null']
+          format: date-time
+          description: null = langkah turunan tanpa timestamp pasti (jangan dikarang)
+        derived:
+          type: boolean
+        detail:
+          type: ['string', 'null']
+        provider:
+          type: ['string', 'null']
+        status:
+          type: ['string', 'null']
+        attempt:
+          type: ['integer', 'null']
+        httpStatus:
+          type: ['integer', 'null']
+    PaymentLinks:
+      type: object
+      description: >-
+        Tautan observability bila tersedia (env LAB_LOKI_URL/LAB_TEMPO_URL);
+        null = fitur belum aktif (obs-full belum dinyalakan), bukan error.
+      required: [log, trace]
+      additionalProperties: false
+      properties:
+        log:
+          type: ['string', 'null']
+        trace:
+          type: ['string', 'null']
+    PaymentDetail:
+      type: object
+      required:
+        - payment
+        - timeline
+        - callbackCount
+        - webhookCount
+        - duplicateCallback
+        - traceId
+        - links
+      additionalProperties: false
+      properties:
+        payment:
+          $ref: '#/components/schemas/PaymentSummary'
+        timeline:
+          type: array
+          items:
+            $ref: '#/components/schemas/PaymentEvent'
+        callbackCount:
+          type: integer
+          minimum: 0
+        webhookCount:
+          type: integer
+          minimum: 0
+        duplicateCallback:
+          type: boolean
+        traceId:
+          type: ['string', 'null']
+        links:
+          $ref: '#/components/schemas/PaymentLinks'
+    PaymentList:
+      type: object
+      required: [checkedAt, dataStatus, hasMore, nextCursor, items]
+      additionalProperties: false
+      properties:
+        checkedAt:
+          type: string
+          format: date-time
+        dataStatus:
+          $ref: '#/components/schemas/DataStatus'
+        hasMore:
+          type: boolean
+        nextCursor:
+          type: ['string', 'null']
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/PaymentSummary'
+    BankStatus:
+      type: object
+      required: [provider, providerRef, status, source, checkedAt]
+      additionalProperties: false
+      properties:
+        provider:
+          type: string
+        providerRef:
+          type: string
+        status:
+          type: string
+          enum: [CHARGED, SUCCESS, FAILED, UNKNOWN]
+        source:
+          type: string
+          enum: [bank]
+        checkedAt:
+          type: string
+          format: date-time
+    TrafficState:
+      type: object
+      required: [ratePerSec, source, checkedAt]
+      additionalProperties: false
+      properties:
+        ratePerSec:
+          type: ['number', 'null']
+          description: Laju arrival konstan (req/s). null = tak terbaca (jangan tebak).
+        source:
+          type: string
+          enum: [loadgen, unknown]
+        checkedAt:
+          type: string
+          format: date-time
+    ProviderRoute:
+      type: object
+      required: [enabled, weight]
+      additionalProperties: false
+      properties:
+        enabled:
+          type: boolean
+        weight:
+          type: integer
+          minimum: 0
+          maximum: 100
+    RoutingConfig:
+      type: object
+      required: [bca, mandiri, ewallet]
+      additionalProperties: false
+      properties:
+        bca:
+          $ref: '#/components/schemas/ProviderRoute'
+        mandiri:
+          $ref: '#/components/schemas/ProviderRoute'
+        ewallet:
+          $ref: '#/components/schemas/ProviderRoute'
+    ReleaseVersion:
+      type: string
+      enum: [good, bad]
+    ReleaseState:
+      type: object
+      required: [version]
+      additionalProperties: false
+      properties:
+        version:
+          $ref: '#/components/schemas/ReleaseVersion'
+    AuditEntry:
+      type: object
+      required: [ts, actor, action, target, result]
+      additionalProperties: false
+      properties:
+        ts:
+          type: string
+          format: date-time
+        actor:
+          type: string
+        action:
+          type: string
+        target:
+          type: string
+        detail:
+          type: string
+        result:
+          type: string
+          enum: [ok, error]
+        error:
+          type: string
+    AuditList:
+      type: object
+      required: [entries]
+      additionalProperties: false
+      properties:
+        entries:
+          type: array
+          items:
+            $ref: '#/components/schemas/AuditEntry'
+    SloSummary:
+      type: object
+      required: [name, service, objective, window, file, backends]
+      additionalProperties: false
+      properties:
+        name:
+          type: string
+          example: payment-success-rate
+        service:
+          type: string
+          example: gateway-api
+        objective:
+          type: number
+          example: 0.995
+        window:
+          type: string
+          example: 1h
+        file:
+          type: string
+          example: success-rate.yml
+        description:
+          type: string
+        backends:
+          type: array
+          items:
+            type: string
+        parseError:
+          type: string
+          description: Terisi bila berkas tak terparse (tetap dicantumkan, jujur)
+    SloList:
+      type: object
+      required: [slos, checkedAt]
+      additionalProperties: false
+      properties:
+        slos:
+          type: array
+          items:
+            $ref: '#/components/schemas/SloSummary'
+        checkedAt:
+          type: string
+          format: date-time
+    SliSpec:
+      type: object
+      required: [type, source, good, total]
+      additionalProperties: false
+      properties:
+        type:
+          type: string
+        source:
+          type: string
+        good:
+          type: string
+        total:
+          type: string
+    BurnRate:
+      type: object
+      required: [longWindow, shortWindow, burnRate, severity]
+      additionalProperties: false
+      properties:
+        longWindow:
+          type: string
+        shortWindow:
+          type: string
+        burnRate:
+          type: number
+        severity:
+          type: string
+          enum: [page, ticket]
+    SloTarget:
+      type: object
+      required: [backend]
+      additionalProperties: false
+      properties:
+        backend:
+          type: string
+    SloDeployment:
+      type: object
+      required: [connection, backend, status]
+      additionalProperties: false
+      properties:
+        connection:
+          type: string
+        backend:
+          type: string
+        status:
+          type: string
+          enum: [applied, pending, drifted, failed]
+          description: applied=sesuai apply terakhir; pending=plan ada perubahan; drifted=backend diubah manual; failed=backend tak terbaca
+        detail:
+          type: string
+    SloCurrent:
+      type: object
+      required: [status]
+      additionalProperties: false
+      properties:
+        status:
+          type: string
+          enum: [ok, no_data, source_down]
+          description: ok=recording rule ada dan segar; no_data=belum apply/belum ada data; source_down=Prometheus mati
+        errorRatio:
+          type: ['number', 'null']
+        sliValue:
+          type: ['number', 'null']
+        lastDataAt:
+          type: ['string', 'null']
+          format: date-time
+        detail:
+          type: string
+    SloBudget:
+      type: object
+      required: [windowSecs, allowedSecs, allowedMinutes]
+      additionalProperties: false
+      properties:
+        windowSecs:
+          type: integer
+          description: window objektif dalam detik
+        allowedSecs:
+          type: number
+          description: jatah error (1-objective)*window dalam detik (float tampilan, bukan uang)
+        allowedMinutes:
+          type: number
+    SloAlert:
+      type: object
+      required: [alert, state, severity]
+      additionalProperties: false
+      properties:
+        alert:
+          type: string
+          example: PaySLOBurnRateHigh
+        state:
+          type: string
+          enum: [firing, pending]
+        severity:
+          type: string
+        window:
+          type: string
+        activeAt:
+          type: ['string', 'null']
+          format: date-time
+    SloDetail:
+      type: object
+      required: [meta, content, sli, burnRates, runbook, targets, deployment, sliCurrent, budget, alerts]
+      additionalProperties: false
+      properties:
+        meta:
+          $ref: '#/components/schemas/SloSummary'
+        content:
+          type: string
+          description: Isi berkas YAML mentah (untuk editor)
+        sli:
+          $ref: '#/components/schemas/SliSpec'
+        burnRates:
+          type: array
+          items:
+            $ref: '#/components/schemas/BurnRate'
+        runbook:
+          type: string
+        targets:
+          type: array
+          items:
+            $ref: '#/components/schemas/SloTarget'
+        deployment:
+          type: array
+          items:
+            $ref: '#/components/schemas/SloDeployment'
+        sliCurrent:
+          $ref: '#/components/schemas/SloCurrent'
+        budget:
+          $ref: '#/components/schemas/SloBudget'
+        alerts:
+          type: array
+          items:
+            $ref: '#/components/schemas/SloAlert'
+    SloFilePut:
+      type: object
+      required: [content]
+      additionalProperties: false
+      properties:
+        content:
+          type: string
+          maxLength: 65536
+    SloFileInfo:
+      type: object
+      required: [name, file, bytes]
+      additionalProperties: false
+      properties:
+        name:
+          type: string
+        file:
+          type: string
+        bytes:
+          type: integer
+    SloValidateRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        content:
+          type: string
+          maxLength: 65536
+          description: Draf untuk divalidasi tanpa menyimpan; kosong = validasi berkas tersimpan
+    SloValidationIssue:
+      type: object
+      required: [line, column, message]
+      additionalProperties: false
+      properties:
+        line:
+          type: integer
+          minimum: 1
+        column:
+          type: integer
+          minimum: 1
+        field:
+          type: string
+        message:
+          type: string
+    SloValidation:
+      type: object
+      required: [valid, errors]
+      additionalProperties: false
+      properties:
+        valid:
+          type: boolean
+        errors:
+          type: array
+          items:
+            $ref: '#/components/schemas/SloValidationIssue'
+    PlanChange:
+      type: object
+      required: [slo, connection]
+      additionalProperties: false
+      properties:
+        slo:
+          type: string
+        connection:
+          type: string
+        backend:
+          type: string
+    PlanFile:
+      type: object
+      required: [connection, backend, change]
+      additionalProperties: false
+      properties:
+        connection:
+          type: string
+        backend:
+          type: string
+        change:
+          type: boolean
+        desired:
+          type: string
+          description: Teks rules yang diinginkan (hanya backend prometheus)
+        actual:
+          type: string
+          description: Teks rules di backend saat ini (kosong = belum ada)
+        diff:
+          type: string
+          description: Diff unified actual -> desired
+        note:
+          type: string
+    SloPlan:
+      type: object
+      required: [slo, changes, warnings, files, raw]
+      additionalProperties: false
+      properties:
+        slo:
+          type: string
+        changes:
+          type: array
+          items:
+            $ref: '#/components/schemas/PlanChange'
+        warnings:
+          type: array
+          items:
+            type: string
+        files:
+          type: array
+          items:
+            $ref: '#/components/schemas/PlanFile'
+        raw:
+          type: string
+    SloApplyRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        connections:
+          type: array
+          items:
+            type: string
+          description: Filter koneksi; kosong = semua koneksi
+    ApplyItem:
+      type: object
+      required: [slo, connection, applied, noOp, message]
+      additionalProperties: false
+      properties:
+        slo:
+          type: string
+        connection:
+          type: string
+        backend:
+          type: string
+        applied:
+          type: boolean
+        noOp:
+          type: boolean
+          description: true = apply kedua tanpa perubahan (up-to-date); UI menampilkannya jelas
+        message:
+          type: string
+    SloApply:
+      type: object
+      required: [slo, results, warnings, raw]
+      additionalProperties: false
+      properties:
+        slo:
+          type: string
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/ApplyItem'
+        warnings:
+          type: array
+          items:
+            type: string
+        raw:
+          type: string
+    DriftItem:
+      type: object
+      required: [slo, connection, reason]
+      additionalProperties: false
+      properties:
+        slo:
+          type: string
+        connection:
+          type: string
+        reason:
+          type: string
+    SloDrift:
+      type: object
+      required: [drifted, clean, raw]
+      additionalProperties: false
+      properties:
+        drifted:
+          type: array
+          items:
+            $ref: '#/components/schemas/DriftItem'
+        clean:
+          type: boolean
+        raw:
+          type: string
+    CapabilityRow:
+      type: object
+      required: [feature, prometheus, datadog]
+      additionalProperties: false
+      properties:
+        feature:
+          type: string
+        prometheus:
+          type: string
+        datadog:
+          type: string
+    CapabilityMatrix:
+      type: object
+      required: [features, raw]
+      additionalProperties: false
+      properties:
+        features:
+          type: array
+          items:
+            $ref: '#/components/schemas/CapabilityRow'
+        raw:
+          type: string
+    Incident:
+      type: object
+      required: [id, title, slo, service, status, severity, createdAt]
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        slo:
+          type: string
+        service:
+          type: string
+        status:
+          type: string
+          enum: [open, acknowledged, resolved]
+        severity:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        resolvedAt:
+          type: ['string', 'null']
+          format: date-time
+    IncidentList:
+      type: object
+      required: [incidents, checkedAt]
+      additionalProperties: false
+      properties:
+        incidents:
+          type: array
+          items:
+            $ref: '#/components/schemas/Incident'
+        checkedAt:
+          type: string
+          format: date-time
+    TimelineEntry:
+      type: object
+      required: [ts, kind, actor, message]
+      additionalProperties: false
+      properties:
+        ts:
+          type: string
+          format: date-time
+        kind:
+          type: string
+          description: opened|reopened|resolved|note|approval_requested|approval_approved|approval_rejected|remediation|...
+        actor:
+          type: string
+        message:
+          type: string
+    CorrelatedAlert:
+      type: object
+      required: [fingerprint, source, slo, service, severity, status, payload, receivedAt]
+      additionalProperties: false
+      properties:
+        fingerprint:
+          type: string
+        source:
+          type: string
+        slo:
+          type: string
+        service:
+          type: string
+        severity:
+          type: string
+        status:
+          type: string
+          enum: [firing, resolved]
+        payload:
+          type: object
+          description: Payload alert mentah (dirender sebagai teks, tak dieksekusi)
+        receivedAt:
+          type: string
+          format: date-time
+    Approval:
+      type: object
+      required: [id, executionId, stepIdx, incidentId, action, status, requestedAt]
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+        executionId:
+          type: string
+        stepIdx:
+          type: integer
+        incidentId:
+          type: string
+        action:
+          type: string
+        status:
+          type: string
+          enum: [pending, approved, rejected, expired]
+        requestedAt:
+          type: string
+          format: date-time
+        decidedAt:
+          type: ['string', 'null']
+          format: date-time
+        decidedBy:
+          type: ['string', 'null']
+        reason:
+          type: ['string', 'null']
+        deduped:
+          type: boolean
+    ApprovalList:
+      type: object
+      required: [approvals]
+      additionalProperties: false
+      properties:
+        approvals:
+          type: array
+          items:
+            $ref: '#/components/schemas/Approval'
+    ApprovalEnvelope:
+      type: object
+      required: [approval]
+      additionalProperties: false
+      properties:
+        approval:
+          $ref: '#/components/schemas/Approval'
+        deduped:
+          type: boolean
+    ApprovalRequestPut:
+      type: object
+      required: [action]
+      additionalProperties: false
+      properties:
+        action:
+          type: string
+          description: Harus sama dengan langkah remediation di runbook
+        step:
+          type: integer
+          minimum: 0
+    ApprovalDecisionPut:
+      type: object
+      required: [decision]
+      additionalProperties: false
+      properties:
+        decision:
+          type: string
+          enum: [approved, rejected]
+        by:
+          type: string
+          description: Identitas approver (default dari pengaturan bila kosong)
+        reason:
+          type: string
+          description: Wajib bila rejected
+    RunbookStep:
+      type: object
+      required: [idx, name, kind, action, requiresApproval]
+      additionalProperties: false
+      properties:
+        idx:
+          type: integer
+        name:
+          type: string
+        kind:
+          type: string
+          enum: [diagnostic, remediation, manual]
+        action:
+          type: string
+        impact:
+          type: string
+        detail:
+          type: string
+        requiresApproval:
+          type: boolean
+        run:
+          type: object
+          description: Spesifikasi executor server-side (bukan input browser)
+        approval:
+          $ref: '#/components/schemas/Approval'
+    RunbookView:
+      type: object
+      required: [present, steps]
+      additionalProperties: false
+      properties:
+        present:
+          type: boolean
+        file:
+          type: string
+        steps:
+          type: array
+          items:
+            $ref: '#/components/schemas/RunbookStep'
+    StepOutput:
+      type: object
+      required: [status]
+      additionalProperties: false
+      properties:
+        status:
+          type: string
+          enum: [ok, no_data, source_down, failed]
+        detail:
+          type: string
+        values:
+          type: object
+    IncidentDetail:
+      type: object
+      required: [incident, timeline, alerts, runbook, approvals]
+      additionalProperties: false
+      properties:
+        incident:
+          $ref: '#/components/schemas/Incident'
+        timeline:
+          type: array
+          items:
+            $ref: '#/components/schemas/TimelineEntry'
+        alerts:
+          type: array
+          items:
+            $ref: '#/components/schemas/CorrelatedAlert'
+        runbook:
+          $ref: '#/components/schemas/RunbookView'
+        approvals:
+          type: array
+          items:
+            $ref: '#/components/schemas/Approval'
+    IncidentNotePut:
+      type: object
+      required: [text]
+      additionalProperties: false
+      properties:
+        text:
+          type: string
+          maxLength: 2000
+    PostmortemSections:
+      type: object
+      additionalProperties: false
+      properties:
+        summary:
+          type: string
+        impact:
+          type: string
+        timeline:
+          type: string
+        rootCause:
+          type: string
+        wentWell:
+          type: string
+        wentWrong:
+          type: string
+        actions:
+          type: array
+          items:
+            type: string
+    Postmortem:
+      type: object
+      required: [incidentId, status, sections, markdown, exists]
+      additionalProperties: false
+      properties:
+        incidentId:
+          type: string
+        status:
+          type: string
+          enum: [draft, published]
+        sections:
+          $ref: '#/components/schemas/PostmortemSections'
+        updatedAt:
+          type: string
+        updatedBy:
+          type: string
+        markdown:
+          type: string
+        exists:
+          type: boolean
+    PostmortemPut:
+      type: object
+      required: [status, sections]
+      additionalProperties: false
+      properties:
+        status:
+          type: string
+          enum: [draft, published]
+        sections:
+          $ref: '#/components/schemas/PostmortemSections'
+    LabSettings:
+      type: object
+      additionalProperties: false
+      properties:
+        traineeName:
+          type: string
+    Problem:
+      type: object
+      description: RFC 9457 application/problem+json
+      required: [type, title, status]
+      additionalProperties: false
+      properties:
+        type:
+          type: string
+          format: uri
+          example: 'http://127.0.0.1:8088/problems/stack-unreachable'
+        title:
+          type: string
+          example: Stack tidak terjangkau
+        status:
+          type: integer
+          example: 500
+        detail:
+          type: string
+        instance:
+          type: string
+        errors:
+          type: array
+          description: Rincian validasi per-field (opsional, bila ada masukan buruk)
+          items:
+            $ref: '#/components/schemas/FieldError'
+  responses:
+    Problem:
+      description: RFC 9457 problem+json
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'

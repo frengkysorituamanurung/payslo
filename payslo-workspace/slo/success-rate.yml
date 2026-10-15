@@ -1,0 +1,33 @@
+# Template: payment success rate (lab, window pendek).
+# SLI global (semua channel); breakdown per channel ada di dashboard
+# "Payment Overview". Untuk SLO per channel, duplikat file ini dan tambah
+# selector channel="VA" pada good/total (lihat komentar di bawah).
+apiVersion: payslo/v1
+kind: SLO
+name: payment-success-rate
+service: gateway-api
+description: Share of payments reaching final SUCCESS across all channels.
+objective: 0.995
+window: 1h
+sli:
+  type: success-ratio
+  source: metric
+  good: payment_transactions_total{status="SUCCESS"}
+  total: payment_transactions_total
+alerting:
+  runbook: runbooks/payment-success.md
+  burnRates:
+    - longWindow: 5m
+      shortWindow: 1m
+      burnRate: 14.4
+      severity: page
+    - longWindow: 15m
+      shortWindow: 5m
+      burnRate: 6
+      severity: page
+    - longWindow: 1h
+      shortWindow: 10m
+      burnRate: 2
+      severity: ticket
+targets:
+  - backend: prometheus

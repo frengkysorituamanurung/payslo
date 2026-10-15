@@ -1,0 +1,38 @@
+id: "08"
+title: "Migrasi backend ke datadog-mock"
+brief: |
+  Perusahaan mengevaluasi backend SLO kedua (Datadog). Tugasmu: apply SLO lab
+  yang sama ke datadog-mock, pahami perbedaan kapabilitasnya (baca capability
+  matrix!), buktikan idempotensi dan deteksi drift, lalu jawab dua pertanyaan.
+questions:
+  - id: mapping
+    prompt: Window 1h dipetakan ke apa di Datadog dan mengapa? Bagaimana kamu tahu (warning apa)?
+  - id: drift
+    prompt: Bagaimana cara mendeteksi perubahan manual di backend? Apa outputnya?
+setup:
+  - action: dd_reset
+teardown:
+  - action: dd_reset
+checks:
+  - type: datadog_objects
+    connection: datadog-mock
+    min_slos: 3
+    min_monitors: 7
+    points: 20
+  - type: answer_contains
+    question: mapping
+    contains: "7d"
+    points: 10
+  - type: answer_contains
+    question: drift
+    contains: drift
+    points: 10
+  - type: duration_lt
+    max_secs: 1800
+    soft: true
+scoring:
+  ttd_full_secs: 180
+  ttd_zero_secs: 900
+  ttm_full_secs: 600
+  ttm_zero_secs: 2400
+unsafe_actions: ["chaos:bank", "chaos:db", "chaos:merchant", "deploy:bad"]

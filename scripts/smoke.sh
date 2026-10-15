@@ -1,0 +1,198 @@
+#!/usr/bin/env bash
+# scripts/smoke.sh — smoke test FASE 8 (final, full pipeline).
+#
+# Dari kondisi bersih:
+#   1. up-lite (build lokal) ATAU up-prebuilt (image GHCR ber-tag versi),
+#   2. tunggu semua service healthy,
+#   3. kirim traffic (e2e-basic: pembayaran -> callback -> webhook via Envoy),
+#   4. apply SLO (payslo -> Prometheus rules + datadog-mock),
+#   5. picu skenario 01 dengan solver otomatis,
+#   6. pastikan incident + notifikasi ntfy + pemulihan (resolved),
+#   7. down.
+#
+# Keluar non-zero jika ADA langkah gagal. Dirancang untuk CI dengan batas waktu
+# (timeout-minutes di workflow). Durasi tipikal: up+build ~8 mnt (cold) +
+# solver ~8 mnt (sleep 300+180) + tunggu burn 1h reda ~55-60 mnt = ~75 mnt.
+#
+# Env:
+#   SMOKE_MODE=lite|prebuilt   (default: lite)
+#   PAYSLO_IMAGE_TAG=vX.Y.Z    (hanya untuk prebuilt; default v0.1.0)
+#   PAYSLO_REGISTRY=ghcr.io/<org> (hanya untuk prebuilt)
+#   SMOKE_KEEP_UP=1            (lewati down di akhir, untuk debug)
+#   LAB_BIN                    (default: ./target/debug/lab, di-build bila perlu)
+#   DD_API_KEY                 (default: lab-only-dd-api-key)
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+cd "$ROOT"
+
+MODE="${SMOKE_MODE:-lite}"
+LAB_BIN="${LAB_BIN:-./target/debug/lab}"
+export DD_API_KEY="${DD_API_KEY:-lab-only-dd-api-key}"
+export NTFY_TOPIC="${NTFY_TOPIC:-payslo-lab}"
+
+T0=$(date +%s)
+step_t0=$T0
+step() {
+  local now
+  now=$(date +%s)
+  echo "smoke: [step $1] $2 (+$((now - step_t0))s, total +$((now - T0))s)"
+  step_t0=$now
+}
+fail() { echo "smoke FAIL: $1" >&2; exit 1; }
+need() { command -v "$1" >/dev/null 2>&1 || fail "missing required tool: $1"; }
+
+need docker
+need curl
+need python3
+need cargo
+docker compose version >/dev/null 2>&1 || fail "docker compose v2 tidak tersedia"
+
+if [ "$MODE" = "prebuilt" ]; then
+  COMPOSE=(docker compose -f docker-compose.yml -f docker-compose.prebuilt.yml
+    --profile traffic --profile obs --profile payslo)
+else
+  COMPOSE=(docker compose --profile traffic --profile obs --profile payslo)
+fi
+
+# --- 0. kondisi bersih (idempotent; aman dijalankan ulang) --------------------
+step 0 "reset bersih (down -v)"
+# down -v menghapus volume (DB seed + state payslo) sehingga run berikutnya
+# deterministik; up berikutnya me-seed ulang otomatis via initdb + migrasi.
+"${COMPOSE[@]}" --profile obs-full down -v || fail "compose down -v gagal"
+
+# --- 1. up dari kondisi bersih ---------------------------------------------
+step 1 "up (mode=$MODE)"
+if [ "$MODE" = "prebuilt" ]; then
+  "${COMPOSE[@]}" pull || fail "compose pull (prebuilt) gagal"
+  "${COMPOSE[@]}" up -d || fail "compose up (prebuilt) gagal"
+else
+  "${COMPOSE[@]}" up -d --build || fail "compose up --build (lite) gagal"
+fi
+
+# --- 2. tunggu semua healthy (deadline 10 mnt) ------------------------------
+step 2 "tunggu healthy (deadline 600s)"
+deadline=$(( $(date +%s) + 600 ))
+while :; do
+  notready=$("${COMPOSE[@]}" ps --format '{{.Name}}|{{.Health}}|{{.State}}' 2>/dev/null \
+    | python3 -c "
+import sys
+bad = [l.split('|')[0] for l in sys.stdin if l.strip() and (l.strip().split('|')[2] != 'running' or (l.strip().split('|')[1] not in ('', 'healthy')))]
+print(' '.join(bad))" || true)
+  http_ok=1
+  curl -sf --max-time 3 http://127.0.0.1:3000/healthz >/dev/null 2>&1 || http_ok=0
+  curl -sf --max-time 3 http://127.0.0.1:8081/incidents >/dev/null 2>&1 || http_ok=0
+  curl -sf --max-time 3 http://127.0.0.1:8126/healthz >/dev/null 2>&1 || http_ok=0
+  curl -sf --max-time 3 http://127.0.0.1:8022/ >/dev/null 2>&1 || http_ok=0
+  curl -sf --max-time 3 http://127.0.0.1:9090/-/healthy >/dev/null 2>&1 || http_ok=0
+  if [ -z "$notready" ] && [ "$http_ok" = "1" ]; then
+    echo "smoke: semua healthy + HTTP ok"
+    break
+  fi
+  [ "$(date +%s)" -gt "$deadline" ] && {
+    echo "smoke: service belum healthy:" >&2
+    "${COMPOSE[@]}" ps >&2
+    fail "timeout menunggu healthy"
+  }
+  sleep 10
+done
+
+# --- 3. traffic: pembayaran -> callback -> webhook (via Envoy) ----------------
+step 3 "traffic (e2e-basic.sh)"
+bash scripts/e2e-basic.sh || fail "e2e-basic gagal"
+
+# --- 4. apply SLO ------------------------------------------------------------
+step 4 "apply SLO (payslo -> prometheus + datadog-mock)"
+cargo run -q -p payslo-cli -- validate payslo-workspace/slo --workspace payslo-workspace \
+  || fail "payslo validate gagal"
+cargo run -q -p payslo-cli -- apply payslo-workspace/slo --workspace payslo-workspace \
+  || fail "payslo apply gagal"
+# Pastikan rules termuat di Prometheus (adapter me-reload via /-/reload).
+rules=$(curl -sf http://127.0.0.1:9090/api/v1/rules | python3 -c "
+import json,sys
+d = json.load(sys.stdin)
+names = [g['name'] for g in d['data']['groups']]
+print(' '.join(names))
+") || fail "prometheus /api/v1/rules tidak terbaca"
+echo "smoke: rule groups: $rules"
+case "$rules" in
+  *payslo-payment-success-rate*) echo "smoke: SLO payment-success-rate termuat" ;;
+  *) fail "rule group payslo-payment-success-rate tidak ada di Prometheus" ;;
+esac
+# Pastikan SLO mirror ada di datadog-mock.
+dd_count=$(curl -sf -H "DD-API-KEY: $DD_API_KEY" http://127.0.0.1:8126/api/v1/slo \
+  | python3 -c "import json,sys; print(len(json.load(sys.stdin)['data']))") \
+  || fail "datadog-mock /api/v1/slo tidak terbaca"
+echo "smoke: datadog-mock SLO count=$dd_count"
+[ "$dd_count" -ge 1 ] || fail "datadog-mock tidak berisi SLO hasil apply"
+
+# --- 5. skenario 01 dengan solver otomatis ------------------------------------
+step 5 "scenario 01 (solver otomatis, ~8 mnt)"
+if [ ! -x "$LAB_BIN" ]; then
+  echo "smoke: build lab CLI dulu"
+  cargo build -p lab || fail "cargo build -p lab gagal"
+fi
+# Batas bawah created_at insiden: hanya insiden dari run ini yang diakui
+# (verify 01 menerima insiden lama yang sudah resolved).
+SOLVER_T0=$(python3 -c "import datetime; print((datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(seconds=60)).strftime('%Y-%m-%dT%H:%M:%SZ'))")
+LAB_BIN="$LAB_BIN" bash scenarios/01/solve.sh || fail "solver skenario 01 gagal (verify tidak PASS)"
+
+# --- 6. incident + notifikasi + pemulihan --------------------------------------
+# Pemulihan penuh (incident resolved) mengikuti burn paling lambat 1h/10m:
+# empiris FASE 8: ~10 mnt (periode buruk pendek) hingga ~57 mnt (periode
+# buruk panjang). Poll hingga 65 mnt.
+step 6 "tunggu pemulihan + verifikasi incident/notifikasi (deadline 3900s)"
+deadline=$(( $(date +%s) + 3900 ))
+while :; do
+  INC_JSON=$(curl -sf http://127.0.0.1:8081/incidents) || fail "payslo /incidents tidak terbaca"
+  if echo "$INC_JSON" | SOLVER_T0="$SOLVER_T0" python3 -c "
+import json,sys,os
+t0 = os.environ['SOLVER_T0']
+incs = json.load(sys.stdin)['incidents']
+rec = [i for i in incs if i.get('slo') == 'payment-success-rate' and i.get('created_at','') >= t0 and i.get('resolved_at')]
+sys.exit(0 if rec else 1)
+"; then
+    echo "smoke: incident run ini resolved"
+    break
+  fi
+  [ "$(date +%s)" -gt "$deadline" ] && fail "timeout menunggu incident resolved (slow burn belum reda)"
+  echo "smoke: incident belum resolved, tunggu 30s..."
+  sleep 30
+done
+echo "$INC_JSON" | SOLVER_T0="$SOLVER_T0" python3 -c "
+import json,sys,os
+t0 = os.environ['SOLVER_T0']
+incs = json.load(sys.stdin)['incidents']
+rec = [i for i in incs if i.get('slo') == 'payment-success-rate' and i.get('created_at','') >= t0 and i.get('resolved_at')]
+print('incident ok:', rec[0]['id'], 'resolved_at=', rec[0]['resolved_at'])
+" || fail "assertion incident gagal"
+INC_ID=$(echo "$INC_JSON" | SOLVER_T0="$SOLVER_T0" python3 -c "
+import json,sys,os
+t0 = os.environ['SOLVER_T0']
+incs = json.load(sys.stdin)['incidents']
+rec = [i for i in incs if i.get('slo') == 'payment-success-rate' and i.get('created_at','') >= t0 and i.get('resolved_at')]
+print(rec[0]['id'])")
+# Notifikasi: pesan ntfy untuk incident tersebut harus ada di cache topik.
+# Catatan: endpoint /json ntfy adalah stream yang tidak pernah selesai sendiri,
+# jadi curl SELALU keluar via --max-time (exit 28); yang diassert adalah isinya.
+NTFY_JSON=$(curl -s --max-time 8 "http://127.0.0.1:8022/$NTFY_TOPIC/json?since=all" || true)
+[ -n "$NTFY_JSON" ] || fail "ntfy topic $NTFY_TOPIC kosong/tidak terbaca"
+echo "$NTFY_JSON" | python3 -c "
+import json,sys
+found = [json.loads(l) for l in sys.stdin if l.strip().startswith('{') and '$INC_ID' in l]
+assert found, 'tidak ada notifikasi ntfy untuk incident $INC_ID'
+print('ntfy ok:', len(found), 'pesan untuk', '$INC_ID')
+" || fail "assertion notifikasi ntfy gagal"
+
+# --- 7. down -------------------------------------------------------------------
+step 7 "down"
+if [ "${SMOKE_KEEP_UP:-0}" = "1" ]; then
+  echo "smoke: SMOKE_KEEP_UP=1, lewati down"
+else
+  "${COMPOSE[@]}" --profile obs-full down || fail "compose down gagal"
+  leftover=$(docker compose --profile traffic --profile obs --profile obs-full --profile payslo ps -q 2>/dev/null || true)
+  [ -z "$leftover" ] || fail "masih ada container berjalan setelah down: $leftover"
+fi
+
+T1=$(date +%s)
+echo "smoke PASS (mode=$MODE, total $((T1 - T0))s, id=$INC_ID)"

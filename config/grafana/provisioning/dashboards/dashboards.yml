@@ -1,0 +1,10 @@
+# Grafana dashboard provider (FASE 2).
+apiVersion: 1
+
+providers:
+  - name: payslo-lab
+    type: file
+    updateIntervalSeconds: 10
+    allowUiUpdates: false
+    options:
+      path: /etc/grafana/dashboards

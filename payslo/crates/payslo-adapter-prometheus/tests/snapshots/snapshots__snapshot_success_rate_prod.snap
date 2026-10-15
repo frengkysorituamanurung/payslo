@@ -1,0 +1,93 @@
+---
+source: payslo/crates/payslo-adapter-prometheus/tests/snapshots.rs
+expression: "render_template(\"success-rate-prod.yml\")?"
+---
+groups:
+  - name: payslo-payment-success-rate-prod
+    rules:
+      - record: payslo:slo_error_ratio:payment_success_rate_prod:1h
+        expr: |
+          1 - (
+            sum(rate(payment_transactions_total{status="SUCCESS"}[1h]))
+            /
+            sum(rate(payment_transactions_total[1h]))
+          )
+      - record: payslo:slo_error_ratio:payment_success_rate_prod:30m
+        expr: |
+          1 - (
+            sum(rate(payment_transactions_total{status="SUCCESS"}[30m]))
+            /
+            sum(rate(payment_transactions_total[30m]))
+          )
+      - record: payslo:slo_error_ratio:payment_success_rate_prod:3d
+        expr: |
+          1 - (
+            sum(rate(payment_transactions_total{status="SUCCESS"}[3d]))
+            /
+            sum(rate(payment_transactions_total[3d]))
+          )
+      - record: payslo:slo_error_ratio:payment_success_rate_prod:5m
+        expr: |
+          1 - (
+            sum(rate(payment_transactions_total{status="SUCCESS"}[5m]))
+            /
+            sum(rate(payment_transactions_total[5m]))
+          )
+      - record: payslo:slo_error_ratio:payment_success_rate_prod:6h
+        expr: |
+          1 - (
+            sum(rate(payment_transactions_total{status="SUCCESS"}[6h]))
+            /
+            sum(rate(payment_transactions_total[6h]))
+          )
+      - alert: PaySLOBurnRateHigh
+        expr: |
+          (
+            payslo:slo_error_ratio:payment_success_rate_prod:1h > 0.0144
+            and
+            payslo:slo_error_ratio:payment_success_rate_prod:5m > 0.0144
+          )
+        for: 5m
+        labels:
+          slo: payment-success-rate-prod
+          service: gateway-api
+          severity: page
+          window: "1h"
+        annotations:
+          summary: "SLO payment-success-rate-prod burn rate high (1h over 5m)"
+          runbook_url: "runbooks/payment-success.md"
+          window: "1h"
+      - alert: PaySLOBurnRateHigh
+        expr: |
+          (
+            payslo:slo_error_ratio:payment_success_rate_prod:6h > 0.006
+            and
+            payslo:slo_error_ratio:payment_success_rate_prod:30m > 0.006
+          )
+        for: 30m
+        labels:
+          slo: payment-success-rate-prod
+          service: gateway-api
+          severity: page
+          window: "6h"
+        annotations:
+          summary: "SLO payment-success-rate-prod burn rate high (6h over 30m)"
+          runbook_url: "runbooks/payment-success.md"
+          window: "6h"
+      - alert: PaySLOBurnRateHigh
+        expr: |
+          (
+            payslo:slo_error_ratio:payment_success_rate_prod:3d > 0.001
+            and
+            payslo:slo_error_ratio:payment_success_rate_prod:6h > 0.001
+          )
+        for: 6h
+        labels:
+          slo: payment-success-rate-prod
+          service: gateway-api
+          severity: ticket
+          window: "3d"
+        annotations:
+          summary: "SLO payment-success-rate-prod burn rate high (3d over 6h)"
+          runbook_url: "runbooks/payment-success.md"
+          window: "3d"

@@ -1,0 +1,41 @@
+id: "06"
+title: "Regresi deploy: gateway versi bad"
+brief: |
+  Setelah deploy gateway terbaru, sebagian pembayaran gagal cepat (HTTP 500)
+  dan p99 melonjak. Tidak ada perubahan bank maupun database. Tugasmu:
+  korelasikan dengan anotasi deploy, rollback ke versi baik, dan jawab dua
+  pertanyaan.
+questions:
+  - id: diagnosis
+    prompt: Apa penyebab regresi dan apa buktinya (anotasi deploy? metrik apa)?
+  - id: fix
+    prompt: Bagaimana cara rollback dan verifikasinya?
+setup:
+  - action: deploy_gateway
+    version: bad
+teardown:
+  - action: deploy_gateway
+    version: good
+checks:
+  - type: prometheus_query
+    query: sum(rate(envoy_http_downstream_rq_xx{envoy_http_conn_manager_prefix="ingress",envoy_response_code_class="5"}[2m])) / sum(rate(envoy_http_downstream_rq_completed{envoy_http_conn_manager_prefix="ingress"}[2m]))
+    operator: "<"
+    value: 0.05
+    points: 15
+  - type: answer_contains
+    question: diagnosis
+    contains: deploy
+    points: 15
+  - type: answer_contains
+    question: fix
+    contains: good
+    points: 10
+  - type: duration_lt
+    max_secs: 1800
+    soft: true
+scoring:
+  ttd_full_secs: 120
+  ttd_zero_secs: 600
+  ttm_full_secs: 300
+  ttm_zero_secs: 1500
+unsafe_actions: ["chaos", "deploy:bad"]

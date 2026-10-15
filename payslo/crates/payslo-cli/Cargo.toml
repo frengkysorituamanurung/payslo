@@ -1,0 +1,25 @@
+[package]
+name = "payslo-cli"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "payslo"
+path = "src/main.rs"
+
+[dependencies]
+anyhow = { workspace = true }
+clap = { workspace = true }
+payslo-adapter = { version = "0.1.0", path = "../payslo-adapter" }
+payslo-adapter-datadog = { version = "0.1.0", path = "../payslo-adapter-datadog" }
+payslo-adapter-prometheus = { version = "0.1.0", path = "../payslo-adapter-prometheus" }
+payslo-model = { version = "0.1.0", path = "../payslo-model" }
+payslo-server = { version = "0.1.0", path = "../payslo-server" }
+serde = { workspace = true }
+serde_yaml_ng = { workspace = true }
+tokio = { workspace = true }
+
+[lints]
+workspace = true

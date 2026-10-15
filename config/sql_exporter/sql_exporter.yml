@@ -1,0 +1,54 @@
+# sql_exporter (burningalchemist/sql_exporter). Koneksi memakai user lab_ro
+# (read-only, P4) — DSN di bawah memakai kredensial lab-only yang sama dengan
+# .env.example. Semua query di sini read-only (SELECT).
+global:
+  scrape_timeout: 4s
+  scrape_timeout_offset: 500ms
+  max_connections: 3
+  max_idle_connections: 3
+
+target:
+  # LAB-ONLY credential (synthetic lab, never real secrets).
+  data_source_name: 'postgresql://lab_ro:lab-only-ro-change-me@postgres:5432/payslo_lab?sslmode=disable'
+  collectors: [payments]
+
+collectors:
+  - collector_name: payments
+    # Samakan dengan scrape interval Prometheus (5s) agar SLI lab responsif.
+    min_interval: 5s
+    metrics:
+      # Counter hasil AKHIR per channel/provider/status.
+      # NOTE: PENDING sengaja TIDAK masuk counter ini. Counter hanya naik dan
+      # tidak pernah turun: jika PENDING ikut dihitung, transaksi yang sama
+      # akan terhitung dua kali (sekali saat PENDING, sekali saat final
+      # SUCCESS/FAILED). Status jalan dimodelkan sebagai gauge terpisah.
+      - metric_name: payment_transactions_total
+        type: counter
+        help: 'Final payment outcomes by channel, provider and status.'
+        key_labels: [channel, provider, status]
+        values: [count]
+        query: |
+          SELECT channel, provider, status, COUNT(*) AS count
+          FROM transactions
+          WHERE status IN ('SUCCESS', 'FAILED', 'EXPIRED')
+          GROUP BY channel, provider, status
+      # Gauge transaksi macet: masih PENDING dan dibuat > 5 menit lalu.
+      - metric_name: payment_transactions_pending
+        type: gauge
+        help: 'PENDING transactions older than 5 minutes, by channel/provider.'
+        key_labels: [channel, provider]
+        values: [count]
+        query: |
+          SELECT channel, provider, COUNT(*) AS count
+          FROM transactions
+          WHERE status = 'PENDING' AND created_at < now() - interval '5 minutes'
+          GROUP BY channel, provider
+      - metric_name: payment_webhook_deliveries_total
+        type: counter
+        help: 'Merchant webhook delivery attempts by status.'
+        key_labels: [status]
+        values: [count]
+        query: |
+          SELECT status, COUNT(*) AS count
+          FROM webhook_delivery
+          GROUP BY status

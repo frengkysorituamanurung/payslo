@@ -1,0 +1,63 @@
+# Rust
+/target/
+/debug/
+**/*.rs.bk
+*.pdb
+.cargo/
+
+# Cargo offline vendor / sqlx
+.sqlx/
+!.sqlx/.gitkeep
+
+# Env & secrets (never commit real secrets; this is a local-only lab)
+.env
+.env.*.local
+*.pem
+*.key
+
+# Docker / compose overrides
+docker-compose.override.yml
+
+# IDE & OS
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# Pre-commit / tooling caches
+.pre-commit-cache/
+.mypy_cache/
+.pytest_cache/
+
+# Node (if any tooling)
+node_modules/
+
+# Test / coverage artifacts
+lcov.info
+coverage/
+tarpaulin-report.html
+cobertura.xml
+
+# Lab runtime state (synthetic data only, regenerable)
+data/
+payslo-workspace/data/
+payslo-workspace/state.db
+payslo-workspace/lab-sessions/
+payslo-workspace/lab-audit.jsonl
+payslo-workspace/lab-console/
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
+
+# U0 Lab Console build artifacts
+ui/dist/
+cmd/lab/web/dist/index.html
+cmd/lab/web/dist/assets/
+cmd/lab/labserve
+bin/labserve
+ui/playwright-report/
+ui/test-results/
+cmd/lab/lab

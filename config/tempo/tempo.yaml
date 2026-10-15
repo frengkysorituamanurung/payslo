@@ -1,0 +1,30 @@
+# Tempo single-binary (FASE 2, profil obs-full). OTLP gRPC :4317 (Envoy)
+# + OTLP HTTP :4318, storage lokal (volume).
+server:
+  http_listen_port: 3200
+  grpc_listen_port: 9097
+
+distributor:
+  receivers:
+    otlp:
+      protocols:
+        grpc:
+          endpoint: 0.0.0.0:4317
+        http:
+          endpoint: 0.0.0.0:4318
+
+ingester_client:
+  grpc_client_config:
+    max_recv_msg_size: 4194304
+    max_send_msg_size: 4194304
+
+storage:
+  trace:
+    backend: local
+    local:
+      path: /tmp/tempo/blocks
+    wal:
+      path: /tmp/tempo/wal
+
+usage_report:
+  reporting_enabled: false

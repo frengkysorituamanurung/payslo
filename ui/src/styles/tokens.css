@@ -1,0 +1,65 @@
+@import 'tailwindcss';
+@import '@fontsource/inter';
+
+/* U0 design tokens: satu-satunya sumber warna.
+ * Pasangan teks/latar diuji kontrasnya di src/styles/tokens.test.ts
+ * (teks >= 4.5:1, komponen >= 3:1, kedua tema). Palet aman merah-hijau:
+ * status selalu ikon + teks, bukan warna saja (U8). */
+:root,
+[data-theme='light'] {
+    --surface: #ffffff;
+    --surface-raised: #f3f4f6;
+    --border: #9ca3af;
+    --text: #111827;
+    --text-muted: #4b5563;
+    --accent: #1d4ed8;
+    --accent-text: #ffffff;
+    --ok: #166534;
+    --ok-bg: #dcfce7;
+    --warn: #92400e;
+    --warn-bg: #fef3c7;
+    --crit: #b91c1c;
+    --crit-bg: #fee2e2;
+    --info: #1e40af;
+    --info-bg: #dbeafe;
+    --neutral: #374151;
+    --neutral-bg: #e5e7eb;
+    --radius: 8px;
+    --font-sans: 'Inter', system-ui, sans-serif;
+}
+
+[data-theme='dark'] {
+    --surface: #111827;
+    --surface-raised: #1f2937;
+    --border: #4b5563;
+    --text: #f9fafb;
+    --text-muted: #d1d5db;
+    --accent: #93c5fd;
+    --accent-text: #111827;
+    --ok: #bbf7d0;
+    --ok-bg: #14532d;
+    --warn: #fde68a;
+    --warn-bg: #78350f;
+    --crit: #fecaca;
+    --crit-bg: #7f1d1d;
+    --info: #bfdbfe;
+    --info-bg: #1e3a8a;
+    --neutral: #e5e7eb;
+    --neutral-bg: #374151;
+}
+
+body {
+    background: var(--surface);
+    color: var(--text);
+    font-family: var(--font-sans);
+    font-variant-numeric: tabular-nums;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        transition-duration: 0.01ms !important;
+    }
+}

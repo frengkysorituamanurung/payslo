@@ -1,0 +1,32 @@
+# docker-compose.prebuilt.yml — jalur prebuilt untuk trainee (default quickstart).
+#
+# Usage:
+#   PAYSLO_IMAGE_TAG=v0.1.0 make up-prebuilt
+#
+# File ini di-merge di atas docker-compose.yml dan mengganti `build:` lokal
+# dengan `image:` ber-tag versi dari GHCR. Tag WAJIB ber-versi (vX.Y.Z),
+# DILARANG `latest` (aturan AGENTS.MD). Registry default GHCR; fork/CI
+# menimpa lewat env PAYSLO_REGISTRY (mis. ghcr.io/<org-anda>).
+#
+# Image dipublikasikan oleh workflow `.github/workflows/release.yml`
+# (buildx multi-arch linux/amd64+linux/arm64, musl statis) setiap tag v*.
+# Verifikasi manual: `docker manifest inspect $img` harus mencantumkan
+# amd64 dan arm64.
+
+name: payslo-lab
+
+services:
+  bank-bca:
+    image: "${PAYSLO_REGISTRY:-ghcr.io/payslo-lab}/payslo-lab-bank-sim:${PAYSLO_IMAGE_TAG:-v0.1.0}"
+  bank-mandiri:
+    image: "${PAYSLO_REGISTRY:-ghcr.io/payslo-lab}/payslo-lab-bank-sim:${PAYSLO_IMAGE_TAG:-v0.1.0}"
+  ewallet-sim:
+    image: "${PAYSLO_REGISTRY:-ghcr.io/payslo-lab}/payslo-lab-bank-sim:${PAYSLO_IMAGE_TAG:-v0.1.0}"
+  merchant-sink:
+    image: "${PAYSLO_REGISTRY:-ghcr.io/payslo-lab}/payslo-lab-merchant-sink:${PAYSLO_IMAGE_TAG:-v0.1.0}"
+  gateway-api:
+    image: "${PAYSLO_REGISTRY:-ghcr.io/payslo-lab}/payslo-lab-gateway-api:${PAYSLO_IMAGE_TAG:-v0.1.0}"
+  payslo:
+    image: "${PAYSLO_REGISTRY:-ghcr.io/payslo-lab}/payslo-lab-payslo:${PAYSLO_IMAGE_TAG:-v0.1.0}"
+  datadog-mock:
+    image: "${PAYSLO_REGISTRY:-ghcr.io/payslo-lab}/payslo-lab-datadog-mock:${PAYSLO_IMAGE_TAG:-v0.1.0}"

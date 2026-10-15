@@ -1,0 +1,40 @@
+id: "05"
+title: "Webhook merchant gagal: sink me-return 500"
+brief: |
+  Pembayaran sukses seperti biasa, tetapi merchant melaporkan tidak menerima
+  notifikasi webhook — dasbor operasional mereka kosong. Tugasmu: temukan di
+  mana notifikasi hilang, pulihkan alirannya, dan jawab dua pertanyaan.
+questions:
+  - id: diagnosis
+    prompt: Di mana notifikasi hilang dan apa buktinya?
+  - id: fix
+    prompt: Bagaimana cara memulihkan aliran webhook?
+setup:
+  - action: merchant_mode
+    status: 500
+teardown:
+  - action: merchant_mode
+    status: 200
+checks:
+  - type: prometheus_query
+    query: sum(increase(payment_webhook_deliveries_total{status="DELIVERED"}[3m]))
+    operator: ">"
+    value: 0
+    points: 15
+  - type: answer_contains
+    question: diagnosis
+    contains: "500"
+    points: 15
+  - type: answer_contains
+    question: fix
+    contains: "200"
+    points: 10
+  - type: duration_lt
+    max_secs: 1800
+    soft: true
+scoring:
+  ttd_full_secs: 180
+  ttd_zero_secs: 900
+  ttm_full_secs: 600
+  ttm_zero_secs: 2400
+unsafe_actions: ["chaos:bank", "chaos:db", "chaos:merchant", "deploy:bad"]

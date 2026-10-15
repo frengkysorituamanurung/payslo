@@ -1,0 +1,42 @@
+id: "07"
+title: "Alert noise: flapping burn-rate cepat"
+brief: |
+  Pager berdering berulang kali untuk SLO yang sama: alert page menyala lalu
+  padam sendiri setiap beberapa menit, sementara burn-rate lambat tetap tenang.
+  Tugasmu: bedakan sinyal vs noise lewat multi-window, atasi akar masalahnya,
+  dan jelaskan tuning apa yang akan kamu usulkan.
+questions:
+  - id: diagnosis
+    prompt: Fast burn atau slow burn yang menyala? Apa artinya (transien vs sustained)? Sebut kata "window".
+  - id: tuning
+    prompt: Tuning threshold/window apa yang kamu usulkan agar tidak noisy? Sebut angka contoh.
+setup:
+  - action: bank_profile
+    provider: ewallet
+    profile: flaky
+    error_rate: 0.15
+teardown:
+  - action: bank_reset
+    provider: ewallet
+checks:
+  - type: sli_above
+    query: sum(rate(payment_transactions_total{status="SUCCESS"}[2m])) / sum(rate(payment_transactions_total[2m]))
+    threshold: 0.9
+    points: 15
+  - type: answer_contains
+    question: diagnosis
+    contains: window
+    points: 15
+  - type: answer_contains
+    question: tuning
+    contains: threshold
+    points: 10
+  - type: duration_lt
+    max_secs: 1800
+    soft: true
+scoring:
+  ttd_full_secs: 180
+  ttd_zero_secs: 900
+  ttm_full_secs: 600
+  ttm_zero_secs: 2400
+unsafe_actions: ["chaos:bank", "chaos:db", "chaos:merchant", "deploy:bad"]
