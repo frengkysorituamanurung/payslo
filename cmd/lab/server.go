@@ -13,6 +13,7 @@ import (
 	"path"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -42,6 +43,9 @@ type serverConfig struct {
 	// U4: insiden (proksi payslo-server) + runbook/postmortem milik lab serve.
 	paysloURL  string
 	consoleDir string
+	// U6: mode mentor + snapshot + belajar.
+	mentorPIN   string
+	merchantURL string
 }
 
 // webDist tertanam saat build (Makefile menyalin ui/dist ke sini via ui-build).
@@ -60,7 +64,18 @@ type server struct {
 	incidents   incidents
 	postmortems postmortemSvc
 	settings    settingsSvc
+	// U6: gate PIN mentor (pembatas spoiler), progres SQLite, snapshot demo.
+	mentor          *mentorGate
+	progress        *progressStore
+	demoSnapshots   map[string]*demoSnapshotState
+	demoSnapshotsMu sync.Mutex
+	httpCli         *http.Client
+	bankURLs        map[string]string
+	merchantURL     string
+	adminURL        string
 }
+
+func (s *server) httpClient() *http.Client { return s.httpCli }
 
 // postmortemSvc/settingsSvc: live = file di lab-console/; demo = in-memory.
 type postmortemSvc interface {
@@ -104,6 +119,12 @@ func newServer(cfg serverConfig) *server {
 	if cfg.repoRoot == "" {
 		cfg.repoRoot = envOr("LAB_REPO_ROOT", ".")
 	}
+	if cfg.adminURL == "" {
+		cfg.adminURL = envOr("LAB_GATEWAY_ADMIN_URL", "http://127.0.0.1:3001")
+	}
+	if cfg.merchantURL == "" {
+		cfg.merchantURL = envOr("LAB_MERCHANT_URL", "http://127.0.0.1:5000")
+	}
 	if cfg.auditPath == "" && !cfg.demo {
 		cfg.auditPath = envOr("LAB_AUDIT_PATH", defaultAuditPath(cfg.repoRoot))
 	}
@@ -115,7 +136,12 @@ func newServer(cfg serverConfig) *server {
 			"ewallet": envOr("LAB_BANK_EWALLET_URL", "http://127.0.0.1:4003"),
 		}
 	}
-	s := &server{cfg: cfg, mux: http.NewServeMux(), audit: newAuditor(cfg.auditPath)}
+	s := &server{
+		cfg: cfg, mux: http.NewServeMux(), audit: newAuditor(cfg.auditPath),
+		bankURLs: bankURLs,
+		httpCli:  &http.Client{Timeout: 10 * time.Second},
+	}
+	s.mentor = newMentorGate(cfg.mentorPIN)
 	workspace := cfg.workspace
 	if workspace == "" {
 		workspace = envOr("LAB_WORKSPACE_DIR", filepath.Join(cfg.repoRoot, "payslo-workspace"))
@@ -126,6 +152,14 @@ func newServer(cfg serverConfig) *server {
 	}
 	s.postmortems = &postmortemStore{dir: filepath.Join(consoleDir, "postmortems")}
 	s.settings = &settingsStore{path: filepath.Join(consoleDir, "settings.json")}
+	s.demoSnapshots = map[string]*demoSnapshotState{}
+	progress, err := openProgressStore(consoleDir)
+	if err != nil {
+		// Progres belajar gagal terbuka -> server tetap jalan, endpoint learn
+		// akan menjawab 502/500 dengan penyebab jelas (jujur, tak diamkan).
+		progress = nil
+	}
+	s.progress = progress
 	if cfg.demo {
 		s.payments = newDemoPayments()
 		s.control = newDemoControl()
@@ -211,6 +245,24 @@ func (s *server) registerRoutes() {
 	route("GET /api/v1/approvals", s.handleApprovalsList)
 	route("GET /api/v1/settings", s.handleSettingsGet)
 	route("PUT /api/v1/settings", s.handleSettingsPut)
+	// U6 mentor (guard token; unlock/lock tanpa guard).
+	s.mentorRoute("POST /api/v1/mentor/unlock", false, s.handleMentorUnlock)
+	s.mentorRoute("POST /api/v1/mentor/lock", false, s.handleMentorLock)
+	s.mentorRoute("GET /api/v1/mentor/timeline", true, s.handleMentorTimeline)
+	s.mentorRoute("POST /api/v1/mentor/inject/traffic", true, s.handleMentorInjectTraffic)
+	s.mentorRoute("GET /api/v1/mentor/snapshots", true, s.handleSnapshotList)
+	s.mentorRoute("POST /api/v1/mentor/snapshot/save", true, s.handleSnapshotSave)
+	s.mentorRoute("POST /api/v1/mentor/snapshot/load", true, s.handleSnapshotLoad)
+	s.mentorRoute("GET /api/v1/mentor/sessions", true, s.handleMentorSessions)
+	s.mentorRoute("GET /api/v1/mentor/session-summary", true, s.handleMentorSessionSummary)
+	s.mentorRoute("GET /api/v1/mentor/assessment", true, s.handleMentorAssessmentGet)
+	s.mentorRoute("PUT /api/v1/mentor/assessment", true, s.handleMentorAssessmentPut)
+	s.mentorRoute("GET /api/v1/mentor/export", true, s.handleMentorExport)
+	// U6 belajar.
+	route("GET /api/v1/learn/curriculum", s.handleCurriculum)
+	route("GET /api/v1/learn/glossary", s.handleGlossary)
+	route("GET /api/v1/learn/progress", s.handleLearnProgressGet)
+	route("PUT /api/v1/learn/progress", s.handleLearnProgressPut)
 	s.mux.HandleFunc("/", s.handleWeb)
 }
 
@@ -263,9 +315,13 @@ func writeProblemFields(w http.ResponseWriter, status int, title, detail string,
 func rfc3339(t time.Time) string { return t.UTC().Format(time.RFC3339) }
 
 func (s *server) handleSession(w http.ResponseWriter, r *http.Request) {
+	mode := "trainee"
+	if s.mentor.check(r.Header.Get("X-Mentor-Token")) {
+		mode = "mentor"
+	}
 	if s.cfg.demo {
 		writeJSON(w, http.StatusOK, map[string]any{
-			"mode":        "trainee",
+			"mode":        mode,
 			"traineeName": nil,
 			"scenario":    nil,
 			"labUp":       true,
@@ -277,7 +333,7 @@ func (s *server) handleSession(w http.ResponseWriter, r *http.Request) {
 	// Skenario/nama trainee menyusul di fase berikutnya.
 	st := probeStack()
 	writeJSON(w, http.StatusOK, map[string]any{
-		"mode":        "trainee",
+		"mode":        mode,
 		"traineeName": nil,
 		"scenario":    nil,
 		"labUp":       st.labUp,
@@ -316,6 +372,14 @@ func (s *server) handleWeb(w http.ResponseWriter, r *http.Request) {
 	if s.cfg.devProxy != "" && proxyPrefix(r.URL.Path) {
 		s.proxyToVite(w, r)
 		return
+	}
+	// U6: /mentor hanya untuk mode mentor. Trainee -> 403 (SPA tidak pernah
+	// dihidupkan; menu /mentor juga tidak dirender UI).
+	if r.URL.Path == "/mentor" || strings.HasPrefix(r.URL.Path, "/mentor/") {
+		if !s.mentor.check(r.Header.Get("X-Mentor-Token")) {
+			writeProblem(w, http.StatusForbidden, "Mode mentor diperlukan", "buka mode mentor dengan PIN dulu")
+			return
+		}
 	}
 	// SPA fallback: semua path non-aset menyajikan index.html (routing di
 	// klien). /api/* tidak sampai sini (mux lebih spesifik menang).

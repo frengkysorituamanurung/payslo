@@ -2,6 +2,21 @@
 
 Panduan fasilitator onboarding. Kunci jawaban: `scenarios/*/solution.md`.
 
+## Mode mentor (U6) — jujur tentang gate
+
+Mode mentor dibuka dengan PIN via env `MENTOR_PIN` (default lab: `1234` di
+`.env.example`). **INI ADALAH PEMBATAS SPOILER, BUKAN KEAMANAN.** Yang
+ditangani:
+
+- Menu `/mentor` tidak ditampilkan untuk mode trainee (UI tidak me-render
+  item navigasi; endpoint API mentor mengembalikan 403 tanpa token).
+- Trainee tetap bisa `curl` admin bank-sim/gateway langsung (honor system) —
+  gate ini tidak menutup itu, dan tidak mengklaim menutup.
+- 5x salah PIN -> jeda 5 menit (429 + `Retry-After`). Token dicabut saat
+  keluar mode mentor.
+
+Jangan sebut PIN di depan trainee. Ganti PIN lewat `.env` bila perlu.
+
 ## Daftar cacat sengaja (P3 — JANGAN dibocorkan di depan)
 
 1. **Callback duplikat tidak di-dedup** gateway (`// LAB-FLAW:` di

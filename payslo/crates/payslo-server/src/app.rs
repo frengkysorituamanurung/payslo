@@ -185,6 +185,43 @@ async fn healthz() -> Json<Value> {
     Json(serde_json::json!({"ok": true}))
 }
 
+/// GET /audit[?limit=]: audit log PaySLO (append-only; sumber timeline mentor
+/// di lab serve, digabung dengan audit lab serve berurutan waktu).
+async fn audit_list(
+    State(state): State<Arc<AppState>>,
+    axum::extract::Query(params): axum::extract::Query<BTreeMap<String, String>>,
+) -> Json<Value> {
+    let limit: i64 = params
+        .get("limit")
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(200)
+        .clamp(1, 1000);
+    let entries: Vec<Value> = state
+        .db
+        .lock()
+        .map(|guard| {
+            guard
+                .prepare("SELECT ts, actor, action, details FROM audit_log ORDER BY id LIMIT ?1")
+                .and_then(|mut stmt| {
+                    let rows = stmt.query_map(
+                        [limit],
+                        |row| {
+                            Ok(serde_json::json!({
+                                "ts": row.get::<_, String>(0)?,
+                                "actor": row.get::<_, String>(1)?,
+                                "action": row.get::<_, String>(2)?,
+                                "details": row.get::<_, String>(3)?,
+                            }))
+                        },
+                    )?;
+                    rows.collect::<Result<Vec<_>, _>>()
+                })
+                .unwrap_or_default()
+        })
+        .unwrap_or_default();
+    Json(serde_json::json!({"entries": entries}))
+}
+
 /// GET /incidents[?slo=&service=]: machine-readable incident list for the
 /// lab CLI (avoids SQLite file sharing between container and host).
 async fn list_incidents(
@@ -222,8 +259,8 @@ async fn list_incidents(
                                 "service": row.get::<_, String>(3)?,
                                 "status": row.get::<_, String>(4)?,
                                 "severity": row.get::<_, String>(5)?,
-                                "created_at": row.get::<_, String>(6)?,
-                                "resolved_at": row.get::<_, Option<String>>(7)?,
+                                "createdAt": row.get::<_, String>(6)?,
+                                "resolvedAt": row.get::<_, Option<String>>(7)?,
                             }))
                         },
                     )?;
@@ -239,6 +276,7 @@ async fn list_incidents(
 pub fn router(state: Arc<AppState>) -> Router {
     Router::new()
         .route("/healthz", get(healthz))
+        .route("/audit", get(audit_list))
         .route("/incidents", get(list_incidents))
         .route("/incidents/{id}", get(approvals::incident_detail))
         .route("/incidents/{id}/notes", post(approvals::create_note))

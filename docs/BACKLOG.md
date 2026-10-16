@@ -36,4 +36,12 @@ Rincian 10 isu awal: `docs/GOOD_FIRST_ISSUES.md`.
       traffic/routing/release (mitigasi trainee yang sah).
 - [x] Budget JS: utama 208 KB gzip (< 350 KB); editor CodeMirror chunk malas
       terpisah 142 KB gzip (hanya dimuat di /slo).
-- [ ] MODE mentor + PIN + penegakan spoiler server-side (UI-SPEC §KEAMANAN 6-7).
+- [x] MODE mentor + PIN + penegakan spoiler server-side (UI-SPEC §KEAMANAN 6-7) —
+      selesai FASE U6: gate token + rate limit (5 salah -> jeda 5 mnt), /mentor 403
+      untuk trainee, menu nav disembunyikan, dokumentasi jujur di mentor-guide.
+- [x] Endpoint Go lanjutan: chaos per-provider, scenario, mentor — selesai FASE U6
+      (mentor timeline/inject/snapshot/session/assessment/export + learn
+      curriculum/glossary/progress; chaos per-provider tetap via lab CLI Rust).
+- [x] Halaman: Belajar + Mentor (U6) — render kurikulum tersanitasi, checklist
+      per modul, progres SQLite; timeline audit gabunga, inject, snapshot,
+      penilaian manual, ekspor laporan.

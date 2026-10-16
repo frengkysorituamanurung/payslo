@@ -115,3 +115,38 @@ async fn concurrent_webhooks_one_incident() -> Result<(), String> {
     server.abort();
     Ok(())
 }
+
+/// U6: GET /audit (sumber timeline mentor). Audit tercatat saat insiden
+/// dibuka; endpoint mengembalikan entri {ts, actor, action, details}.
+#[tokio::test]
+async fn audit_endpoint_lists_entries() -> Result<(), String> {
+    let (base, state, server) = serve().await?;
+    post(&base, "/webhooks/alertmanager", &am_payload()).await?;
+    let (_, _, audit_count) = counts(&state)?;
+    assert!(audit_count >= 1, "incident.open must be audited");
+    let (status, body) = get(&base, "/audit").await?;
+    assert_eq!(status, 200, "GET /audit must be public like /incidents");
+    let entries = body["entries"].as_array().cloned().unwrap_or_default();
+    assert!(!entries.is_empty(), "audit entries must list after incident open");
+    let first = &entries[0];
+    for key in ["ts", "actor", "action", "details"] {
+        assert!(first.get(key).is_some(), "audit entry missing {key}");
+    }
+    assert_eq!(first["action"], "incident.open");
+    // limit=1 -> tepat 1 entri.
+    let (_, body1) = get(&base, "/audit?limit=1").await?;
+    assert_eq!(body1["entries"].as_array().map(Vec::len), Some(1));
+    server.abort();
+    Ok(())
+}
+
+async fn get(base: &str, path: &str) -> Result<(u16, serde_json::Value), String> {
+    let resp = reqwest::Client::new()
+        .get(format!("{base}{path}"))
+        .send()
+        .await
+        .map_err(|e| e.to_string())?;
+    let status = resp.status().as_u16();
+    let body = resp.json().await.map_err(|e| e.to_string())?;
+    Ok((status, body))
+}

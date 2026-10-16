@@ -6,7 +6,7 @@ import './i18n';
 import './styles/tokens.css';
 import { AppShell } from './components/AppShell';
 import { ArchMap } from './components/ArchMap';
-import { MissionPage, PlaceholderPage } from './pages/pages';
+import { MissionPage, PlaceholderPage, MentorRoute, LearnRoute } from './pages/pages';
 import { PaymentsPage } from './pages/Payments';
 import { ControlPage } from './pages/Control';
 import { SloPage } from './pages/Slo';
@@ -26,6 +26,8 @@ const router = createBrowserRouter([
             { path: 'control', element: <ControlPage /> },
             { path: 'slo', element: <SloPage /> },
             { path: 'incidents', element: <IncidentsPage /> },
+            { path: 'mentor', element: <MentorRoute /> },
+            { path: 'learn', element: <LearnRoute /> },
             { path: ':page', element: <PlaceholderPage /> },
         ],
     },

@@ -618,12 +618,12 @@ paths:
             application/json:
               schema:
                 type: object
-                required: [ok, incident_id]
+                required: [ok, incidentId]
                 additionalProperties: false
                 properties:
                   ok:
                     type: boolean
-                  incident_id:
+                  incidentId:
                     type: string
         '400':
           $ref: '#/components/responses/Problem'
@@ -829,6 +829,347 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/LabSettings'
+        '400':
+          $ref: '#/components/responses/Problem'
+  /api/v1/mentor/unlock:
+    post:
+      operationId: unlockMentor
+      summary: Buka mode mentor dengan PIN (MENTOR_PIN)
+      description: >-
+        PEMBATAS SPOILER, bukan keamanan (lihat docs/mentor-guide.md). 5
+        salah berurutan -> jeda 5 menit (429 + retryAfterSecs). Token mentor
+        dikembalikan dan wajib dikirim sebagai header X-Mentor-Token pada
+        endpoint /api/v1/mentor/* lainnya.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MentorUnlock'
+      responses:
+        '200':
+          description: Mode mentor aktif
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MentorUnlockResult'
+        '400':
+          $ref: '#/components/responses/Problem'
+        '403':
+          $ref: '#/components/responses/Problem'
+        '429':
+          $ref: '#/components/responses/Problem'
+  /api/v1/mentor/lock:
+    post:
+      operationId: lockMentor
+      summary: Keluar mode mentor (token dicabut di server)
+      responses:
+        '200':
+          description: Mode mentor dinonaktifkan
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok]
+                additionalProperties: false
+                properties:
+                  ok:
+                    type: boolean
+        '403':
+          $ref: '#/components/responses/Problem'
+  /api/v1/mentor/timeline:
+    get:
+      operationId: getMentorTimeline
+      summary: Timeline aksi trainee (audit PaySLO + audit lab serve, digabung urut waktu)
+      description: >-
+        Dua sumber digabung dan diurutkan naik berdasarkan ts (interleave
+        benar diuji dengan data berselang-seling). Sumber: payslo (audit
+        PaySLO) dan lab (audit lab serve).
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 500
+            default: 100
+      responses:
+        '200':
+          description: Entri timeline urut waktu (terlama dulu)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MentorTimeline'
+        '403':
+          $ref: '#/components/responses/Problem'
+        '502':
+          $ref: '#/components/responses/Problem'
+  /api/v1/mentor/inject/traffic:
+    post:
+      operationId: mentorInjectTraffic
+      summary: Injeksikan gangguan laju traffic (mis. x3) dengan konfirmasi di UI
+      description: >-
+        Mutasi: wajib Origin UI + X-Lab-Token + X-Mentor-Token; tercatat di
+        audit. Bila secs diberikan, laju dikembalikan ke nilai semula setelah
+        itu (best-effort, latar belakang).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MentorInjectTraffic'
+      responses:
+        '200':
+          description: Laju baru
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TrafficState'
+        '400':
+          $ref: '#/components/responses/Problem'
+        '403':
+          $ref: '#/components/responses/Problem'
+        '502':
+          $ref: '#/components/responses/Problem'
+  /api/v1/mentor/snapshots:
+    get:
+      operationId: listSnapshots
+      summary: Daftar snapshot + ringkasan (untuk konfirmasi sebelum load)
+      responses:
+        '200':
+          description: Daftar snapshot (terbaru dulu)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SnapshotList'
+        '403':
+          $ref: '#/components/responses/Problem'
+  /api/v1/mentor/snapshot/save:
+    post:
+      operationId: saveSnapshot
+      summary: Simpan snapshot (DB data-only + profil chaos + routing + release)
+      description: >-
+        Mutasi: wajib Origin UI + X-Lab-Token + X-Mentor-Token; tercatat di
+        audit. Menimpa nama yang sama (konfirmasi di UI).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SnapshotName'
+      responses:
+        '200':
+          description: Snapshot tersimpan
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SnapshotSummary'
+        '400':
+          $ref: '#/components/responses/Problem'
+        '403':
+          $ref: '#/components/responses/Problem'
+        '502':
+          $ref: '#/components/responses/Problem'
+  /api/v1/mentor/snapshot/load:
+    post:
+      operationId: loadSnapshot
+      summary: Muat snapshot (timpa DB + profil chaos + routing + release)
+      description: >-
+        Mutasi: wajib Origin UI + X-Lab-Token + X-Mentor-Token; tercatat di
+        audit. Mengembalikan ringkasan apa yang ditimpa (kondisi awal vs
+        akhir per sumber).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SnapshotName'
+      responses:
+        '200':
+          description: Snapshot dimuat; ringkasan penimpaan terlampir
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SnapshotLoadResult'
+        '400':
+          $ref: '#/components/responses/Problem'
+        '403':
+          $ref: '#/components/responses/Problem'
+        '404':
+          $ref: '#/components/responses/Problem'
+        '502':
+          $ref: '#/components/responses/Problem'
+  /api/v1/mentor/sessions:
+    get:
+      operationId: listMentorSessions
+      summary: Daftar sesi trainee (lab-sessions/*.json) untuk ringkasan
+      responses:
+        '200':
+          description: Daftar sesi (terbaru dulu)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MentorSessionList'
+        '403':
+          $ref: '#/components/responses/Problem'
+  /api/v1/mentor/session-summary:
+    get:
+      operationId: getMentorSessionSummary
+      summary: Ringkasan satu sesi (TTD, aksi, jawaban, hint, skor manual)
+      parameters:
+        - name: scenario
+          in: query
+          required: true
+          schema:
+            type: string
+            description: ID skenario (01..09)
+      responses:
+        '200':
+          description: Ringkasan sesi
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MentorSessionSummary'
+        '400':
+          $ref: '#/components/responses/Problem'
+        '403':
+          $ref: '#/components/responses/Problem'
+        '404':
+          $ref: '#/components/responses/Problem'
+  /api/v1/mentor/assessment:
+    get:
+      operationId: getMentorAssessment
+      summary: Penilaian manual mentor (komunikasi + postmortem) + catatan
+      parameters:
+        - name: scenario
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Penilaian (belum ada = null)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MentorAssessment'
+        '403':
+          $ref: '#/components/responses/Problem'
+    put:
+      operationId: putMentorAssessment
+      summary: Simpan penilaian manual (skor 0..10 + catatan per aspek)
+      description: 'Mutasi: wajib Origin UI + X-Lab-Token + X-Mentor-Token; tercatat di audit.'
+      parameters:
+        - name: scenario
+          in: query
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MentorAssessmentPut'
+      responses:
+        '200':
+          description: Penilaian tersimpan
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MentorAssessment'
+        '400':
+          $ref: '#/components/responses/Problem'
+        '403':
+          $ref: '#/components/responses/Problem'
+  /api/v1/mentor/export:
+    get:
+      operationId: exportMentorReport
+      summary: Ekspor laporan sesi mentor (Markdown atau JSON)
+      parameters:
+        - name: scenario
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: format
+          in: query
+          schema:
+            type: string
+            enum: [markdown, json]
+            default: markdown
+      responses:
+        '200':
+          description: Laporan (markdown = text/markdown; json = application/json)
+          content:
+            text/markdown:
+              schema:
+                type: string
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MentorSessionSummary'
+        '400':
+          $ref: '#/components/responses/Problem'
+        '403':
+          $ref: '#/components/responses/Problem'
+        '404':
+          $ref: '#/components/responses/Problem'
+  /api/v1/learn/curriculum:
+    get:
+      operationId: getCurriculum
+      summary: Kurikulum hari 1-5 (Markdown -> HTML tersanitasi server-side)
+      description: >-
+        HTML aman: SEMUA HTML mentah di-escape (tak ada <script>, iframe,
+        event handler, atau URL javascript:). Link hanya http/https/mailto.
+        Checklist per modul diambil dari daftar Aktivitas + Latihan.
+      responses:
+        '200':
+          description: Modul kurikulum (HTML tersanitasi + checklist)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Curriculum'
+        '404':
+          $ref: '#/components/responses/Problem'
+  /api/v1/learn/glossary:
+    get:
+      operationId: getGlossary
+      summary: Glosarium istilah SRE lab (SLI, SLO, error budget, dst.)
+      responses:
+        '200':
+          description: Daftar istilah (terurut)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Glossary'
+  /api/v1/learn/progress:
+    get:
+      operationId: getLearnProgress
+      summary: Progres checklist trainee (SQLite lab serve; tahan restart)
+      responses:
+        '200':
+          description: Peta module -> itemKey -> done
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LearnProgress'
+    put:
+      operationId: putLearnProgress
+      summary: Tandai checklist (tersimpan di SQLite lab serve)
+      description: 'Mutasi: wajib Origin UI + X-Lab-Token; tercatat di audit.'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LearnProgressPut'
+      responses:
+        '200':
+          description: Progres tersimpan
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LearnProgress'
         '400':
           $ref: '#/components/responses/Problem'
 components:
@@ -1995,6 +2336,322 @@ components:
           description: Rincian validasi per-field (opsional, bila ada masukan buruk)
           items:
             $ref: '#/components/schemas/FieldError'
+    MentorUnlock:
+      type: object
+      required: [pin]
+      additionalProperties: false
+      properties:
+        pin:
+          type: string
+          description: PIN mentor (MENTOR_PIN). Lab-only, bukan keamanan.
+    MentorUnlockResult:
+      type: object
+      required: [ok, token]
+      additionalProperties: false
+      properties:
+        ok:
+          type: boolean
+        token:
+          type: string
+          description: Token mentor (kirim sebagai header X-Mentor-Token)
+        retryAfterSecs:
+          type: integer
+          description: Hanya ada saat 429 (jeda setelah 5 salah)
+    MentorTimelineEntry:
+      type: object
+      required: [ts, source, actor, action, detail]
+      additionalProperties: false
+      properties:
+        ts:
+          type: string
+          format: date-time
+        source:
+          type: string
+          enum: [payslo, lab]
+        actor:
+          type: string
+        action:
+          type: string
+        detail:
+          type: string
+    MentorTimeline:
+      type: object
+      required: [entries]
+      additionalProperties: false
+      properties:
+        entries:
+          type: array
+          items:
+            $ref: '#/components/schemas/MentorTimelineEntry'
+    MentorInjectTraffic:
+      type: object
+      required: [ratePerSec]
+      additionalProperties: false
+      properties:
+        ratePerSec:
+          type: integer
+          minimum: 1
+          maximum: 100
+        secs:
+          type: integer
+          minimum: 1
+          description: 'Opsional: kembalikan ke laju semula setelah N detik'
+    SnapshotName:
+      type: object
+      required: [name]
+      additionalProperties: false
+      properties:
+        name:
+          type: string
+          pattern: '^[a-z0-9][a-z0-9-]{0,62}$'
+    SnapshotSummary:
+      type: object
+      required: [name, savedAt, dataTables, sources]
+      additionalProperties: false
+      properties:
+        name:
+          type: string
+        savedAt:
+          type: string
+          format: date-time
+        dataTables:
+          type: integer
+          description: Jumlah tabel data dalam dump
+        sources:
+          type: object
+          additionalProperties: true
+          description: Profil tersimpan (banks, merchant, routing, release)
+    SnapshotInfo:
+      type: object
+      required: [name, savedAt, dataTables, overwritten]
+      additionalProperties: false
+      properties:
+        name:
+          type: string
+        savedAt:
+          type: string
+          format: date-time
+        dataTables:
+          type: integer
+        overwritten:
+          type: boolean
+          description: true bila nama sudah ada dan ditimpa
+    SnapshotList:
+      type: object
+      required: [snapshots]
+      additionalProperties: false
+      properties:
+        snapshots:
+          type: array
+          items:
+            $ref: '#/components/schemas/SnapshotInfo'
+    SnapshotLoadResult:
+      type: object
+      required: [name, restored]
+      additionalProperties: false
+      properties:
+        name:
+          type: string
+        restored:
+          type: array
+          items:
+            type: string
+          description: Ringkasan per sumber yang ditimpa (db, bca, merchant, routing, release)
+    MentorSessionInfo:
+      type: object
+      required: [scenarioId, startedAt, endedAt]
+      additionalProperties: false
+      properties:
+        scenarioId:
+          type: string
+        startedAt:
+          type: string
+          format: date-time
+        endedAt:
+          type: ['string', 'null']
+          format: date-time
+    MentorSessionList:
+      type: object
+      required: [sessions]
+      additionalProperties: false
+      properties:
+        sessions:
+          type: array
+          items:
+            $ref: '#/components/schemas/MentorSessionInfo'
+    MentorSessionSummary:
+      type: object
+      required: [scenarioId, traineeName, startedAt, endedAt, ttdSecs, actionCount, answerCount, hintsUsed, actions, answers, assessment]
+      additionalProperties: false
+      properties:
+        scenarioId:
+          type: string
+        traineeName:
+          type: string
+        startedAt:
+          type: string
+          format: date-time
+        endedAt:
+          type: ['string', 'null']
+          format: date-time
+        ttdSecs:
+          type: ['integer', 'null']
+          description: Detik dari mulai sesi ke aksi pertama (null = belum ada)
+        actionCount:
+          type: integer
+        answerCount:
+          type: integer
+        hintsUsed:
+          type: integer
+        actions:
+          type: array
+          items:
+            type: object
+            required: [ts, cmd, detail]
+            additionalProperties: false
+            properties:
+              ts:
+                type: string
+                format: date-time
+              cmd:
+                type: string
+              detail:
+                type: string
+        answers:
+          type: object
+          additionalProperties:
+            type: string
+          description: questionId -> jawaban
+        assessment:
+          $ref: '#/components/schemas/MentorAssessment'
+    MentorAssessment:
+      type: object
+      required: [scenarioId]
+      additionalProperties: false
+      properties:
+        scenarioId:
+          type: string
+        communicationScore:
+          type: ['integer', 'null']
+          minimum: 0
+          maximum: 10
+        communicationNote:
+          type: string
+        postmortemScore:
+          type: ['integer', 'null']
+          minimum: 0
+          maximum: 10
+        postmortemNote:
+          type: string
+        updatedAt:
+          type: ['string', 'null']
+          format: date-time
+    MentorAssessmentPut:
+      type: object
+      additionalProperties: false
+      properties:
+        communicationScore:
+          type: integer
+          minimum: 0
+          maximum: 10
+        communicationNote:
+          type: string
+        postmortemScore:
+          type: integer
+          minimum: 0
+          maximum: 10
+        postmortemNote:
+          type: string
+    CurriculumModule:
+      type: object
+      required: [day, title, html, items]
+      additionalProperties: false
+      properties:
+        day:
+          type: string
+          example: day-01
+        title:
+          type: string
+        html:
+          type: string
+          description: HTML tersanitasi (tak ada HTML mentah; semua di-escape)
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/ChecklistItem'
+    ChecklistItem:
+      type: object
+      required: [key, label, section]
+      additionalProperties: false
+      properties:
+        key:
+          type: string
+          example: aktivitas-1
+        label:
+          type: string
+        section:
+          type: string
+          enum: [aktivitas, latihan]
+    Curriculum:
+      type: object
+      required: [modules]
+      additionalProperties: false
+      properties:
+        modules:
+          type: array
+          items:
+            $ref: '#/components/schemas/CurriculumModule'
+    GlossaryTerm:
+      type: object
+      required: [term, definition]
+      additionalProperties: false
+      properties:
+        term:
+          type: string
+        definition:
+          type: string
+    Glossary:
+      type: object
+      required: [terms]
+      additionalProperties: false
+      properties:
+        terms:
+          type: array
+          items:
+            $ref: '#/components/schemas/GlossaryTerm'
+    LearnProgress:
+      type: object
+      required: [items]
+      additionalProperties: false
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/LearnProgressItem'
+    LearnProgressItem:
+      type: object
+      required: [module, key, done]
+      additionalProperties: false
+      properties:
+        module:
+          type: string
+          example: day-01
+        key:
+          type: string
+        done:
+          type: boolean
+    LearnProgressPut:
+      type: object
+      required: [module, key, done]
+      additionalProperties: false
+      properties:
+        module:
+          type: string
+          example: day-01
+        key:
+          type: string
+        done:
+          type: boolean
   responses:
     Problem:
       description: RFC 9457 problem+json

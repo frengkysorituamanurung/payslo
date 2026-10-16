@@ -1,6 +1,8 @@
 import { useTranslation } from 'react-i18next';
 import { useParams } from 'react-router-dom';
 import { MissionControl } from '../components/MissionControl';
+import { MentorPage } from './Mentor';
+import { LearnPage } from './Learn';
 
 const KEYS = [
     'mission',
@@ -32,4 +34,12 @@ export function PlaceholderPage() {
 
 export function MissionPage() {
     return <MissionControl />;
+}
+
+export function MentorRoute() {
+    return <MentorPage />;
+}
+
+export function LearnRoute() {
+    return <LearnPage />;
 }

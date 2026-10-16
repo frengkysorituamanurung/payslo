@@ -283,6 +283,11 @@ func (d *demoIncidents) SavePM(id, status string, sections postmortemSections, b
 	return doc, nil
 }
 
+func (d *demoIncidents) paysloAudit(_ context.Context, _ int) ([]mentorTimelineEntry, error) {
+	// Demo: audit PaySLO kosong (pengujian interleave via mergeTimeline murni).
+	return []mentorTimelineEntry{}, nil
+}
+
 func (d *demoIncidents) RunStep(_ context.Context, incidentID string, idx int) (stepOutput, error) {
 	if incidentID != demoIncidentID {
 		return stepOutput{}, errIncidentNotFound

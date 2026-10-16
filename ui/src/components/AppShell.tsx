@@ -4,7 +4,8 @@ import { useTranslation } from 'react-i18next';
 import { useSession, useStackHealth } from '../hooks/useLab';
 import { useEvents } from '../hooks/useEvents';
 import { usePendingApprovals, useIncidents } from '../hooks/useIncidents';
-import { setActor } from '../api/client';
+import { setActor, setMentorToken } from '../api/client';
+import { useMentorLock, useMentorUnlock } from '../hooks/useMentor';
 import { applyTheme, initialTheme } from '../utils/theme';
 import { StatusBadge } from './StatusBadge';
 import { CopyCommand } from './CopyCommand';
@@ -25,6 +26,85 @@ const ROUTES = [
 
 function pathOf(r: (typeof ROUTES)[number]): string {
     return r === 'mission' ? '/' : `/${r}`;
+}
+
+// Dialog PIN mentor: pembatas spoiler (bukan keamanan). Dokumentasi jujur
+// di docs/mentor-guide.md.
+function MentorUnlockDialog({ onClose }: { onClose: () => void }) {
+    const { t } = useTranslation();
+    const unlock = useMentorUnlock();
+    const [pin, setPin] = useState('');
+    const [error, setError] = useState('');
+
+    return (
+        <div
+            role="dialog"
+            aria-modal="true"
+            aria-label={t('mentor.unlockTitle')}
+            style={{
+                position: 'fixed',
+                inset: 0,
+                background: 'rgba(0,0,0,0.4)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                zIndex: 100,
+            }}
+        >
+            <div
+                style={{
+                    background: 'var(--surface-raised)',
+                    border: '1px solid var(--border)',
+                    borderRadius: 'var(--radius)',
+                    padding: 24,
+                    minWidth: 320,
+                }}
+            >
+                <h2 style={{ marginTop: 0 }}>{t('mentor.unlockTitle')}</h2>
+                <p style={{ color: 'var(--text-muted)', fontSize: 12 }}>{t('mentor.unlockHint')}</p>
+                <form
+                    onSubmit={(e) => {
+                        e.preventDefault();
+                        setError('');
+                        unlock.mutate(pin, {
+                            onSuccess: (data) => {
+                                setMentorToken(data.token);
+                                onClose();
+                            },
+                            onError: (err) => {
+                                setError(err.message);
+                            },
+                        });
+                    }}
+                >
+                    <label>
+                        {t('mentor.unlockPin')}
+                        <input
+                            type="password"
+                            value={pin}
+                            onChange={(e) => {
+                                setPin(e.target.value);
+                                setError('');
+                            }}
+                        />
+                    </label>
+                    {error !== '' && (
+                        <p role="alert" style={{ color: 'var(--crit)' }}>
+                            {error}
+                        </p>
+                    )}
+                    <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+                        <button type="submit" disabled={unlock.isPending || pin.trim() === ''}>
+                            {unlock.isPending ? t('common.loading') : t('mentor.unlockButton')}
+                        </button>
+                        <button type="button" onClick={onClose}>
+                            {t('common.cancel')}
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    );
 }
 
 export function AppShell() {
@@ -111,6 +191,9 @@ export function AppShell() {
 
     const stackUp = stack.data?.labUp ?? false;
     const showOnboarding = stack.isSuccess && !stackUp;
+    const isMentor = session.data?.mode === 'mentor';
+    const [unlockOpen, setUnlockOpen] = useState(false);
+    const lock = useMentorLock();
 
     return (
         <div style={{ display: 'flex', minHeight: '100vh' }}>
@@ -123,7 +206,7 @@ export function AppShell() {
                     {t('app.tagline')}
                 </p>
                 <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'grid', gap: 2 }}>
-                    {ROUTES.map((r) => (
+                    {ROUTES.filter((r) => r !== 'mentor' || isMentor).map((r) => (
                         <li key={r}>
                             <NavLink
                                 to={pathOf(r)}
@@ -180,13 +263,46 @@ export function AppShell() {
                         <StatusBadge state="unknown" />
                     )}
                     {session.isSuccess && (
-                        <span style={{ fontWeight: 600 }}>
-                            {session.data.mode === 'mentor'
-                                ? t('topbar.modeMentor')
-                                : t('topbar.modeTrainee')}
+                        <span
+                            role="status"
+                            style={{
+                                fontWeight: 700,
+                                padding: '2px 10px',
+                                borderRadius: 'var(--radius)',
+                                background: isMentor ? 'var(--warn-bg)' : 'var(--neutral-bg)',
+                                color: isMentor ? 'var(--warn)' : 'var(--neutral)',
+                            }}
+                        >
+                            {isMentor ? '★ ' : ''}
+                            {isMentor ? t('topbar.modeMentor') : t('topbar.modeTrainee')}
                         </span>
                     )}
+                    {isMentor && (
+                        <button
+                            type="button"
+                            onClick={() => {
+                                lock.mutate(undefined, {
+                                    onSettled: () => {
+                                        setMentorToken(null);
+                                    },
+                                });
+                            }}
+                        >
+                            {t('mentor.exitMentor')}
+                        </button>
+                    )}
                     <span style={{ flex: 1 }} />
+                    {!isMentor && (
+                        <button
+                            type="button"
+                            onClick={() => {
+                                setUnlockOpen(true);
+                            }}
+                            aria-label={t('mentor.unlockButton')}
+                        >
+                            🔒 {t('mentor.unlockButton')}
+                        </button>
+                    )}
                     <label>
                         {t('topbar.theme')}{' '}
                         <select
@@ -251,6 +367,13 @@ export function AppShell() {
                     </div>
                 ))}
             </div>
+            {unlockOpen && (
+                <MentorUnlockDialog
+                    onClose={() => {
+                        setUnlockOpen(false);
+                    }}
+                />
+            )}
         </div>
     );
 }

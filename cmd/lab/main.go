@@ -57,11 +57,12 @@ func run(args []string) error {
 	token := hex.EncodeToString(tokenBytes)
 
 	srv := newServer(serverConfig{
-		demo:     *demo,
-		devProxy: *devProxy,
-		webDir:   *webDir,
-		token:    token,
-		port:     port,
+		demo:      *demo,
+		devProxy:  *devProxy,
+		webDir:    *webDir,
+		token:     token,
+		port:      port,
+		mentorPIN: os.Getenv("MENTOR_PIN"),
 	})
 	log.Printf("lab serve di http://%s (demo=%v dev-proxy=%q)", *addr, *demo, *devProxy)
 	return http.ListenAndServe(*addr, srv.handler())

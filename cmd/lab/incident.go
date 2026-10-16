@@ -90,6 +90,7 @@ type incidents interface {
 	RequestApproval(ctx context.Context, incidentID, action string, stepIdx int, by string) (approval, error)
 	DecideApproval(ctx context.Context, approvalID, decision, by, reason string) (approval, error)
 	RunStep(ctx context.Context, incidentID string, idx int) (stepOutput, error)
+	paysloAudit(ctx context.Context, limit int) ([]mentorTimelineEntry, error)
 }
 
 // ------------------------------------------------------------------ klien payslo-server
@@ -378,7 +379,7 @@ func (l *liveIncidents) RequestApproval(ctx context.Context, incidentID, action 
 		return approval{}, fmt.Errorf("%w: aksi %q bukan langkah remediation runbook", errApprovalValidation, action)
 	}
 	code, body, err := l.payslo.post(ctx, "/approvals", map[string]any{
-		"incident_id": incidentID, "action": action, "step_idx": stepIdx, "requested_by": by,
+		"incidentId": incidentID, "action": action, "stepIdx": stepIdx, "requestedBy": by,
 	})
 	if err != nil {
 		return approval{}, err
@@ -465,6 +466,10 @@ func (l *liveIncidents) executeRemediation(ctx context.Context, ap approval, by 
 
 // RunStep menjalankan SATU langkah diagnostic (output segar tiap klik).
 // Remediation/manual ditolak di sini (409/400): remediation lewat approval.
+func (l *liveIncidents) paysloAudit(ctx context.Context, limit int) ([]mentorTimelineEntry, error) {
+	return l.payslo.getAudit(ctx, limit)
+}
+
 func (l *liveIncidents) RunStep(ctx context.Context, incidentID string, idx int) (stepOutput, error) {
 	detail, err := l.Get(ctx, incidentID)
 	if err != nil {

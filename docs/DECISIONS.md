@@ -571,3 +571,36 @@ konteks, opsi, keputusan, alasan. Opsi paling sederhana diutamakan.
   konten-identik; revisi browser dicatat (ASSUMPTIONS U4-6).
 - Alasan: determinisme > kecepatan untuk 7 spec (~11 dtk); bump playwright
   wajib verifikasi ulang snapshot.
+
+### 2026-10-16 — U6: SQLite di lab serve (modernc.org/sqlite)
+- Konteks: progres checklist Belajar + penilaian manual mentor harus bertahan
+  restart `lab serve` (acceptance U6). pilihan: (a) JSON file seperti
+  postmortem/settings, (b) SQLite, (c) library di crates/lab via CLI.
+- Keputusan: SQLite via `modernc.org/sqlite v1.38.1` (pure Go, tanpa cgo) di
+  `payslo-workspace/lab-console/lab.db`.
+- Alasan: sesuai spesifikasi AGENTS.md (SQLite untuk state lab CLI); tanpa cgo
+  menjaga build statis; satu file untuk progress + assessment; `sqlx` tidak
+  bisa dipakai bersama `rusqlite` (konflik libsqlite3-sys, lihat FASE 1).
+- Dampak: +1 dependensi Go; waktu build lab serve +~2 dtk (ukuran binary +~3 MB).
+
+### 2026-10-16 — U6: renderer Markdown aman tanpa raw HTML
+- Konteks: kurikulum Markdown harus di-render ke HTML yang aman (acceptance:
+  `<script>`, event handler, `javascript:`, iframe disanitasi). pilihan: (a)
+  library markdown + DOMPurify, (b) renderer kustom dengan escape total.
+- Keputusan: renderer kustom `cmd/lab/markdown.go` — SEMUA raw HTML di-escape
+  (tidak ada passthrough); hanya tag renderer sendiri yang muncul; link hanya
+  http/https/mailto. DOMPurify (`dompurify@3.4.17`) tetap jalan di UI sebagai
+  lapisan kedua sebelum `dangerouslySetInnerHTML`.
+- Alasan: tanpa dependensi baru untuk library markdown; escape total =
+  sanitasi terkuat yang bisa dibuktikan dengan unit test; DOMPurify menutup
+  celah jika renderer kustom bug. Kurikulum tidak butuh tabel/gambar.
+
+### 2026-10-16 — U6: gate PIN mentor = pembatas spoiler
+- Konteks: mode mentor harus dipin via `MENTOR_PIN`. pilihan: (a) auth
+  sungguhan (session/JWT), (b) token sederhana + rate limit.
+- Keputusan: (b) — token acak di memori server, dikirim client sebagai
+  `X-Mentor-Token`; 5 salah -> jeda 5 menit (429 + Retry-After). Dokumentasi
+  jujur di mentor-guide: ini PEMBATAS SPOILER, bukan keamanan (trainee tetap
+  bisa curl admin bank-sim langsung — honor system).
+- Alasan: sesuai UI-SPEC §KEAMANAN 6; auth sungguhan di luar scope lab;
+  rate limit mencegah brute-force casual.

@@ -13,10 +13,16 @@ import type { paths } from './schema';
 const baseUrl = typeof window === 'undefined' ? '' : window.location.origin;
 
 let actor = 'trainee';
+let mentorToken: string | null = null;
 
 /** Dipanggil AppShell setelah sesi dimuat (mode trainee/mentor). */
 export function setActor(next: string): void {
   actor = next;
+}
+
+/** Dipanggil setelah unlock/lock mentor; header dikirim di SEMUA request. */
+export function setMentorToken(token: string | null): void {
+  mentorToken = token;
 }
 
 function labToken(): string {
@@ -40,6 +46,11 @@ const liveFetch: typeof fetch = (input, init) => {
     const token = labToken();
     if (token !== '') headers.set('X-Lab-Token', token);
     headers.set('X-Lab-Actor', actor);
+  }
+  // Token mentor dikirim di SEMUA request (termasuk GET) agar server bisa
+  // memvalidasi mode mentor di endpoint /api/v1/mentor/* dan route /mentor.
+  if (mentorToken !== null && mentorToken !== '') {
+    headers.set('X-Mentor-Token', mentorToken);
   }
   return globalThis.fetch(input, { ...init, headers });
 };
@@ -110,6 +121,27 @@ export type Postmortem =
   paths['/api/v1/incidents/{id}/postmortem']['get']['responses']['200']['content']['application/json'];
 export type LabSettings =
   paths['/api/v1/settings']['get']['responses']['200']['content']['application/json'];
+
+// U6 mentor.
+export type MentorTimelineEntry =
+  paths['/api/v1/mentor/timeline']['get']['responses']['200']['content']['application/json']['entries'][number];
+export type SnapshotInfo =
+  paths['/api/v1/mentor/snapshots']['get']['responses']['200']['content']['application/json']['snapshots'][number];
+export type MentorSessionInfo =
+  paths['/api/v1/mentor/sessions']['get']['responses']['200']['content']['application/json']['sessions'][number];
+export type MentorSessionSummary =
+  paths['/api/v1/mentor/session-summary']['get']['responses']['200']['content']['application/json'];
+export type MentorAssessment =
+  paths['/api/v1/mentor/assessment']['get']['responses']['200']['content']['application/json'];
+
+// U6 belajar.
+export type CurriculumModule =
+  paths['/api/v1/learn/curriculum']['get']['responses']['200']['content']['application/json']['modules'][number];
+export type ChecklistItem = CurriculumModule['items'][number];
+export type GlossaryTerm =
+  paths['/api/v1/learn/glossary']['get']['responses']['200']['content']['application/json']['terms'][number];
+export type LearnProgressItem =
+  paths['/api/v1/learn/progress']['get']['responses']['200']['content']['application/json']['items'][number];
 
 declare global {
   interface Window {

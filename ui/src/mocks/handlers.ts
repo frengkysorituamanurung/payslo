@@ -27,6 +27,11 @@ export const demoSession: Session = {
   checkedAt: '2026-10-16T07:00:00Z',
 };
 
+// U6: state mentor (token mock — bukan keamanan) + learn progress.
+let mentorUnlocked = false;
+const mentorToken = 'mock-mentor-token';
+const learnProgressState = new Map<string, boolean>();
+
 export const demoStack: StackHealth = {
   labUp: true,
   checkedAt: '2026-10-16T07:00:00Z',
@@ -256,6 +261,8 @@ export function resetMockState(): void {
   mockState = fixtures();
   resetSloState();
   resetIncidentState();
+  mentorUnlocked = false;
+  learnProgressState.clear();
 }
 
 function problem(
@@ -277,7 +284,9 @@ function problem(
 }
 
 export const handlers = [
-  http.get('*/api/v1/session', () => HttpResponse.json(demoSession)),
+  http.get('*/api/v1/session', () =>
+    HttpResponse.json({ ...demoSession, mode: mentorUnlocked ? 'mentor' : 'trainee' }),
+  ),
   http.get('*/api/v1/health/stack', () => HttpResponse.json(demoStack)),
   http.get('*/api/v1/metrics/summary', () => HttpResponse.json(demoSummary)),
   http.get('*/api/v1/metrics/series', () =>
@@ -700,6 +709,182 @@ export const handlers = [
       return problem(400, 'Pengaturan buruk', 'nama trainee 1..64 karakter');
     incidentState.settings = { traineeName: name };
     return HttpResponse.json(incidentState.settings);
+  }),
+
+  // ------------------------------------------------------------------ U6 mentor + belajar
+  http.post('*/api/v1/mentor/unlock', async ({ request }) => {
+    const body = (await request.json()) as { pin?: string };
+    if (body.pin !== '1234') return problem(401, 'PIN salah', 'PIN salah');
+    mentorUnlocked = true;
+    return HttpResponse.json({ ok: true, token: mentorToken });
+  }),
+  http.post('*/api/v1/mentor/lock', () => {
+    mentorUnlocked = false;
+    return HttpResponse.json({ ok: true });
+  }),
+  http.get('*/api/v1/mentor/timeline', ({ request }) => {
+    if (!mentorUnlocked) return problem(403, 'Mode mentor diperlukan', 'PIN dulu');
+    const url = new URL(request.url);
+    const limit = Number(url.searchParams.get('limit') ?? '100');
+    const entries = [
+      { ts: BASE, source: 'lab', actor: 'trainee', action: 'routing.set', detail: 'bca=false' },
+      {
+        ts: '2026-10-16T07:01:00Z',
+        source: 'payslo',
+        actor: 'payslo',
+        action: 'incident.open',
+        detail: 'inc-x',
+      },
+      {
+        ts: '2026-10-16T07:02:00Z',
+        source: 'lab',
+        actor: 'trainee',
+        action: 'traffic.set',
+        detail: '6',
+      },
+    ];
+    return HttpResponse.json({ entries: entries.slice(0, limit) });
+  }),
+  http.post('*/api/v1/mentor/inject/traffic', async ({ request }) => {
+    if (!mentorUnlocked) return problem(403, 'Mode mentor diperlukan', 'PIN dulu');
+    const body = (await request.json()) as { ratePerSec: number };
+    mockState.traffic = { ratePerSec: body.ratePerSec, source: 'loadgen', checkedAt: BASE };
+    return HttpResponse.json(mockState.traffic);
+  }),
+  http.get('*/api/v1/mentor/snapshots', () => {
+    if (!mentorUnlocked) return problem(403, 'Mode mentor diperlukan', 'PIN dulu');
+    return HttpResponse.json({ snapshots: [{ name: 'demo-snap', savedAt: BASE, dataTables: 3 }] });
+  }),
+  http.post('*/api/v1/mentor/snapshot/save', async ({ request }) => {
+    if (!mentorUnlocked) return problem(403, 'Mode mentor diperlukan', 'PIN dulu');
+    const body = (await request.json()) as { name: string };
+    return HttpResponse.json({ name: body.name, savedAt: BASE, dataTables: 3 });
+  }),
+  http.post('*/api/v1/mentor/snapshot/load', async ({ request }) => {
+    if (!mentorUnlocked) return problem(403, 'Mode mentor diperlukan', 'PIN dulu');
+    const body = (await request.json()) as { name: string };
+    if (body.name !== 'demo-snap') return problem(404, 'Snapshot tidak ditemukan', 'tidak ada');
+    return HttpResponse.json({ name: body.name, restored: ['routing', 'release', 'traffic'] });
+  }),
+  http.get('*/api/v1/mentor/sessions', () => {
+    if (!mentorUnlocked) return problem(403, 'Mode mentor diperlukan', 'PIN dulu');
+    return HttpResponse.json({
+      sessions: [
+        { scenarioId: '01', startedAt: BASE, endedAt: '2026-10-16T07:30:00Z' },
+        { scenarioId: '02', startedAt: '2026-10-16T06:00:00Z', endedAt: null },
+      ],
+    });
+  }),
+  http.get('*/api/v1/mentor/session-summary', ({ request }) => {
+    if (!mentorUnlocked) return problem(403, 'Mode mentor diperlukan', 'PIN dulu');
+    const url = new URL(request.url);
+    const scenario = url.searchParams.get('scenario') ?? '01';
+    return HttpResponse.json({
+      scenarioId: scenario,
+      traineeName: 'Trainee Demo',
+      startedAt: BASE,
+      endedAt: '2026-10-16T07:30:00Z',
+      ttdSecs: 60,
+      actionCount: 3,
+      answerCount: 1,
+      hintsUsed: 1,
+      actions: [{ ts: '2026-10-16T07:01:00Z', cmd: 'routing', detail: 'bca=false' }],
+      answers: { q1: 'jawaban' },
+      assessment: {
+        scenarioId: scenario,
+        communicationScore: 8,
+        communicationNote: 'baik',
+        postmortemScore: 7,
+        postmortemNote: 'lengkap',
+      },
+    });
+  }),
+  http.get('*/api/v1/mentor/assessment', ({ request }) => {
+    if (!mentorUnlocked) return problem(403, 'Mode mentor diperlukan', 'PIN dulu');
+    const url = new URL(request.url);
+    const scenario = url.searchParams.get('scenario') ?? '01';
+    return HttpResponse.json({
+      scenarioId: scenario,
+      communicationScore: 8,
+      communicationNote: 'baik',
+      postmortemScore: 7,
+      postmortemNote: 'lengkap',
+    });
+  }),
+  http.put('*/api/v1/mentor/assessment', async ({ request }) => {
+    if (!mentorUnlocked) return problem(403, 'Mode mentor diperlukan', 'PIN dulu');
+    const url = new URL(request.url);
+    const scenario = url.searchParams.get('scenario') ?? '01';
+    const body = (await request.json()) as Record<string, unknown>;
+    return HttpResponse.json({ scenarioId: scenario, ...body });
+  }),
+  http.get('*/api/v1/mentor/export', ({ request }) => {
+    if (!mentorUnlocked) return problem(403, 'Mode mentor diperlukan', 'PIN dulu');
+    const url = new URL(request.url);
+    const scenario = url.searchParams.get('scenario') ?? '01';
+    const format = url.searchParams.get('format') ?? 'markdown';
+    if (format === 'json') {
+      return HttpResponse.json({ scenarioId: scenario, traineeName: 'Trainee Demo' });
+    }
+    return new HttpResponse(
+      `# Laporan Sesi Mentor — Skenario ${scenario}\n\n- Trainee: Trainee Demo\n`,
+      {
+        headers: { 'Content-Type': 'text/markdown; charset=utf-8' },
+      },
+    );
+  }),
+
+  // U6: belajar
+  http.get('*/api/v1/learn/curriculum', () =>
+    HttpResponse.json({
+      modules: [
+        {
+          day: 'day-01',
+          title: 'Hari 1 — Kenali Sistem',
+          html: '<h1>Hari 1</h1>\n<p>Kenali sistem.</p>',
+          items: [
+            { key: 'aktivitas-1', label: 'Baca README', section: 'aktivitas' },
+            { key: 'aktivitas-2', label: 'make up-lite', section: 'aktivitas' },
+            { key: 'latihan-1', label: 'Kirim pembayaran', section: 'latihan' },
+          ],
+        },
+        {
+          day: 'day-02',
+          title: 'Hari 2 — Golden Signals',
+          html: '<h1>Hari 2</h1>\n<p>Golden signals.</p>',
+          items: [{ key: 'aktivitas-1', label: 'Buka Grafana', section: 'aktivitas' }],
+        },
+      ],
+    }),
+  ),
+  http.get('*/api/v1/learn/glossary', () =>
+    HttpResponse.json({
+      terms: [
+        { term: 'SLI', definition: 'Service Level Indicator.' },
+        { term: 'SLO', definition: 'Service Level Objective.' },
+        { term: 'Error budget', definition: '1 - SLO.' },
+      ],
+    }),
+  ),
+  http.get('*/api/v1/learn/progress', () => {
+    const items = [...learnProgressState.entries()]
+      .filter(([, done]) => done)
+      .map(([k]) => {
+        const [module, key] = k.split(':');
+        return { module, key, done: true };
+      });
+    return HttpResponse.json({ items });
+  }),
+  http.put('*/api/v1/learn/progress', async ({ request }) => {
+    const body = (await request.json()) as { module: string; key: string; done: boolean };
+    learnProgressState.set(`${body.module}:${body.key}`, body.done);
+    const items = [...learnProgressState.entries()]
+      .filter(([, done]) => done)
+      .map(([k]) => {
+        const [module, key] = k.split(':');
+        return { module, key, done: true };
+      });
+    return HttpResponse.json({ items });
   }),
 ];
 

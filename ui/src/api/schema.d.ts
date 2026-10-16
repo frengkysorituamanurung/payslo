@@ -535,6 +535,270 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/mentor/unlock": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Buka mode mentor dengan PIN (MENTOR_PIN)
+         * @description PEMBATAS SPOILER, bukan keamanan (lihat docs/mentor-guide.md). 5 salah berurutan -> jeda 5 menit (429 + retryAfterSecs). Token mentor dikembalikan dan wajib dikirim sebagai header X-Mentor-Token pada endpoint /api/v1/mentor/* lainnya.
+         */
+        post: operations["unlockMentor"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/mentor/lock": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Keluar mode mentor (token dicabut di server) */
+        post: operations["lockMentor"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/mentor/timeline": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Timeline aksi trainee (audit PaySLO + audit lab serve, digabung urut waktu)
+         * @description Dua sumber digabung dan diurutkan naik berdasarkan ts (interleave benar diuji dengan data berselang-seling). Sumber: payslo (audit PaySLO) dan lab (audit lab serve).
+         */
+        get: operations["getMentorTimeline"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/mentor/inject/traffic": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Injeksikan gangguan laju traffic (mis. x3) dengan konfirmasi di UI
+         * @description Mutasi: wajib Origin UI + X-Lab-Token + X-Mentor-Token; tercatat di audit. Bila secs diberikan, laju dikembalikan ke nilai semula setelah itu (best-effort, latar belakang).
+         */
+        post: operations["mentorInjectTraffic"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/mentor/snapshots": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Daftar snapshot + ringkasan (untuk konfirmasi sebelum load) */
+        get: operations["listSnapshots"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/mentor/snapshot/save": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Simpan snapshot (DB data-only + profil chaos + routing + release)
+         * @description Mutasi: wajib Origin UI + X-Lab-Token + X-Mentor-Token; tercatat di audit. Menimpa nama yang sama (konfirmasi di UI).
+         */
+        post: operations["saveSnapshot"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/mentor/snapshot/load": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Muat snapshot (timpa DB + profil chaos + routing + release)
+         * @description Mutasi: wajib Origin UI + X-Lab-Token + X-Mentor-Token; tercatat di audit. Mengembalikan ringkasan apa yang ditimpa (kondisi awal vs akhir per sumber).
+         */
+        post: operations["loadSnapshot"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/mentor/sessions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Daftar sesi trainee (lab-sessions/*.json) untuk ringkasan */
+        get: operations["listMentorSessions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/mentor/session-summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Ringkasan satu sesi (TTD, aksi, jawaban, hint, skor manual) */
+        get: operations["getMentorSessionSummary"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/mentor/assessment": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Penilaian manual mentor (komunikasi + postmortem) + catatan */
+        get: operations["getMentorAssessment"];
+        /**
+         * Simpan penilaian manual (skor 0..10 + catatan per aspek)
+         * @description Mutasi: wajib Origin UI + X-Lab-Token + X-Mentor-Token; tercatat di audit.
+         */
+        put: operations["putMentorAssessment"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/mentor/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Ekspor laporan sesi mentor (Markdown atau JSON) */
+        get: operations["exportMentorReport"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/learn/curriculum": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Kurikulum hari 1-5 (Markdown -> HTML tersanitasi server-side)
+         * @description HTML aman: SEMUA HTML mentah di-escape (tak ada <script>, iframe, event handler, atau URL javascript:). Link hanya http/https/mailto. Checklist per modul diambil dari daftar Aktivitas + Latihan.
+         */
+        get: operations["getCurriculum"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/learn/glossary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Glosarium istilah SRE lab (SLI, SLO, error budget, dst.) */
+        get: operations["getGlossary"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/learn/progress": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Progres checklist trainee (SQLite lab serve; tahan restart) */
+        get: operations["getLearnProgress"];
+        /**
+         * Tandai checklist (tersimpan di SQLite lab serve)
+         * @description Mutasi: wajib Origin UI + X-Lab-Token; tercatat di audit.
+         */
+        put: operations["putLearnProgress"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1069,6 +1333,153 @@ export interface components {
             instance?: string;
             /** @description Rincian validasi per-field (opsional, bila ada masukan buruk) */
             errors?: components["schemas"]["FieldError"][];
+        };
+        MentorUnlock: {
+            /** @description PIN mentor (MENTOR_PIN). Lab-only, bukan keamanan. */
+            pin: string;
+        };
+        MentorUnlockResult: {
+            ok: boolean;
+            /** @description Token mentor (kirim sebagai header X-Mentor-Token) */
+            token: string;
+            /** @description Hanya ada saat 429 (jeda setelah 5 salah) */
+            retryAfterSecs?: number;
+        };
+        MentorTimelineEntry: {
+            /** Format: date-time */
+            ts: string;
+            /** @enum {string} */
+            source: "payslo" | "lab";
+            actor: string;
+            action: string;
+            detail: string;
+        };
+        MentorTimeline: {
+            entries: components["schemas"]["MentorTimelineEntry"][];
+        };
+        MentorInjectTraffic: {
+            ratePerSec: number;
+            /** @description Opsional: kembalikan ke laju semula setelah N detik */
+            secs?: number;
+        };
+        SnapshotName: {
+            name: string;
+        };
+        SnapshotSummary: {
+            name: string;
+            /** Format: date-time */
+            savedAt: string;
+            /** @description Jumlah tabel data dalam dump */
+            dataTables: number;
+            /** @description Profil tersimpan (banks, merchant, routing, release) */
+            sources: {
+                [key: string]: unknown;
+            };
+        };
+        SnapshotInfo: {
+            name: string;
+            /** Format: date-time */
+            savedAt: string;
+            dataTables: number;
+            /** @description true bila nama sudah ada dan ditimpa */
+            overwritten: boolean;
+        };
+        SnapshotList: {
+            snapshots: components["schemas"]["SnapshotInfo"][];
+        };
+        SnapshotLoadResult: {
+            name: string;
+            /** @description Ringkasan per sumber yang ditimpa (db, bca, merchant, routing, release) */
+            restored: string[];
+        };
+        MentorSessionInfo: {
+            scenarioId: string;
+            /** Format: date-time */
+            startedAt: string;
+            /** Format: date-time */
+            endedAt: string | null;
+        };
+        MentorSessionList: {
+            sessions: components["schemas"]["MentorSessionInfo"][];
+        };
+        MentorSessionSummary: {
+            scenarioId: string;
+            traineeName: string;
+            /** Format: date-time */
+            startedAt: string;
+            /** Format: date-time */
+            endedAt: string | null;
+            /** @description Detik dari mulai sesi ke aksi pertama (null = belum ada) */
+            ttdSecs: number | null;
+            actionCount: number;
+            answerCount: number;
+            hintsUsed: number;
+            actions: {
+                /** Format: date-time */
+                ts: string;
+                cmd: string;
+                detail: string;
+            }[];
+            /** @description questionId -> jawaban */
+            answers: {
+                [key: string]: string;
+            };
+            assessment: components["schemas"]["MentorAssessment"];
+        };
+        MentorAssessment: {
+            scenarioId: string;
+            communicationScore?: number | null;
+            communicationNote?: string;
+            postmortemScore?: number | null;
+            postmortemNote?: string;
+            /** Format: date-time */
+            updatedAt?: string | null;
+        };
+        MentorAssessmentPut: {
+            communicationScore?: number;
+            communicationNote?: string;
+            postmortemScore?: number;
+            postmortemNote?: string;
+        };
+        CurriculumModule: {
+            /** @example day-01 */
+            day: string;
+            title: string;
+            /** @description HTML tersanitasi (tak ada HTML mentah; semua di-escape) */
+            html: string;
+            items: components["schemas"]["ChecklistItem"][];
+        };
+        ChecklistItem: {
+            /** @example aktivitas-1 */
+            key: string;
+            label: string;
+            /** @enum {string} */
+            section: "aktivitas" | "latihan";
+        };
+        Curriculum: {
+            modules: components["schemas"]["CurriculumModule"][];
+        };
+        GlossaryTerm: {
+            term: string;
+            definition: string;
+        };
+        Glossary: {
+            terms: components["schemas"]["GlossaryTerm"][];
+        };
+        LearnProgress: {
+            items: components["schemas"]["LearnProgressItem"][];
+        };
+        LearnProgressItem: {
+            /** @example day-01 */
+            module: string;
+            key: string;
+            done: boolean;
+        };
+        LearnProgressPut: {
+            /** @example day-01 */
+            module: string;
+            key: string;
+            done: boolean;
         };
     };
     responses: {
@@ -1757,7 +2168,7 @@ export interface operations {
                 content: {
                     "application/json": {
                         ok: boolean;
-                        incident_id: string;
+                        incidentId: string;
                     };
                 };
             };
@@ -1997,6 +2408,393 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["LabSettings"];
+                };
+            };
+            400: components["responses"]["Problem"];
+        };
+    };
+    unlockMentor: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MentorUnlock"];
+            };
+        };
+        responses: {
+            /** @description Mode mentor aktif */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MentorUnlockResult"];
+                };
+            };
+            400: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+            429: components["responses"]["Problem"];
+        };
+    };
+    lockMentor: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Mode mentor dinonaktifkan */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        ok: boolean;
+                    };
+                };
+            };
+            403: components["responses"]["Problem"];
+        };
+    };
+    getMentorTimeline: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Entri timeline urut waktu (terlama dulu) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MentorTimeline"];
+                };
+            };
+            403: components["responses"]["Problem"];
+            502: components["responses"]["Problem"];
+        };
+    };
+    mentorInjectTraffic: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MentorInjectTraffic"];
+            };
+        };
+        responses: {
+            /** @description Laju baru */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TrafficState"];
+                };
+            };
+            400: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+            502: components["responses"]["Problem"];
+        };
+    };
+    listSnapshots: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Daftar snapshot (terbaru dulu) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SnapshotList"];
+                };
+            };
+            403: components["responses"]["Problem"];
+        };
+    };
+    saveSnapshot: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SnapshotName"];
+            };
+        };
+        responses: {
+            /** @description Snapshot tersimpan */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SnapshotSummary"];
+                };
+            };
+            400: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+            502: components["responses"]["Problem"];
+        };
+    };
+    loadSnapshot: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SnapshotName"];
+            };
+        };
+        responses: {
+            /** @description Snapshot dimuat; ringkasan penimpaan terlampir */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SnapshotLoadResult"];
+                };
+            };
+            400: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            502: components["responses"]["Problem"];
+        };
+    };
+    listMentorSessions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Daftar sesi (terbaru dulu) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MentorSessionList"];
+                };
+            };
+            403: components["responses"]["Problem"];
+        };
+    };
+    getMentorSessionSummary: {
+        parameters: {
+            query: {
+                scenario: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Ringkasan sesi */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MentorSessionSummary"];
+                };
+            };
+            400: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+        };
+    };
+    getMentorAssessment: {
+        parameters: {
+            query: {
+                scenario: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Penilaian (belum ada = null) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MentorAssessment"];
+                };
+            };
+            403: components["responses"]["Problem"];
+        };
+    };
+    putMentorAssessment: {
+        parameters: {
+            query: {
+                scenario: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MentorAssessmentPut"];
+            };
+        };
+        responses: {
+            /** @description Penilaian tersimpan */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MentorAssessment"];
+                };
+            };
+            400: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+        };
+    };
+    exportMentorReport: {
+        parameters: {
+            query: {
+                scenario: string;
+                format?: "markdown" | "json";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Laporan (markdown = text/markdown; json = application/json) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/markdown": string;
+                    "application/json": components["schemas"]["MentorSessionSummary"];
+                };
+            };
+            400: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+        };
+    };
+    getCurriculum: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Modul kurikulum (HTML tersanitasi + checklist) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Curriculum"];
+                };
+            };
+            404: components["responses"]["Problem"];
+        };
+    };
+    getGlossary: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Daftar istilah (terurut) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Glossary"];
+                };
+            };
+        };
+    };
+    getLearnProgress: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Peta module -> itemKey -> done */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LearnProgress"];
+                };
+            };
+        };
+    };
+    putLearnProgress: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LearnProgressPut"];
+            };
+        };
+        responses: {
+            /** @description Progres tersimpan */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LearnProgress"];
                 };
             };
             400: components["responses"]["Problem"];
