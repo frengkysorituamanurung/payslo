@@ -152,7 +152,16 @@ func renderPostmortem(incident incidentSummary, doc postmortemDoc) string {
 // ------------------------------------------------------------------ pengaturan
 
 type labSettings struct {
-	TraineeName string `json:"traineeName"`
+	TraineeName        string   `json:"traineeName"`
+	LowSampleThreshold *float64 `json:"lowSampleThreshold,omitempty"`
+}
+
+// defaultLowSampleThreshold: default UI-SPEC 0.2/s bila belum diatur.
+func (s labSettings) thresholdOrDefault() float64 {
+	if s.LowSampleThreshold == nil {
+		return 0.2
+	}
+	return *s.LowSampleThreshold
 }
 
 type settingsStore struct {
@@ -201,6 +210,13 @@ func (s *settingsStore) Get() labSettings {
 	return out
 }
 
+func validateLowSampleThreshold(v float64) error {
+	if v < 0 || v > 10 {
+		return fmt.Errorf("ambang data-sedikit harus 0..10")
+	}
+	return nil
+}
+
 func (s *settingsStore) Set(name string) (labSettings, error) {
 	name, err := validateTraineeName(name)
 	if err != nil {
@@ -208,18 +224,50 @@ func (s *settingsStore) Set(name string) (labSettings, error) {
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if err := os.MkdirAll(filepath.Dir(s.path), 0o755); err != nil {
-		return labSettings{}, err
-	}
-	out := labSettings{TraineeName: name}
-	raw, err := json.MarshalIndent(out, "", "  ")
-	if err != nil {
-		return labSettings{}, err
-	}
-	if err := os.WriteFile(s.path, raw, 0o644); err != nil {
+	out := s.readLocked()
+	out.TraineeName = name
+	if err := s.writeLocked(out); err != nil {
 		return labSettings{}, err
 	}
 	return out, nil
+}
+
+func (s *settingsStore) SetThreshold(v float64) (labSettings, error) {
+	if err := validateLowSampleThreshold(v); err != nil {
+		return labSettings{}, err
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	out := s.readLocked()
+	out.LowSampleThreshold = &v
+	if err := s.writeLocked(out); err != nil {
+		return labSettings{}, err
+	}
+	return out, nil
+}
+
+// readLocked/writeLocked: akses file dengan asumsi mutex sudah dipegang.
+func (s *settingsStore) readLocked() labSettings {
+	raw, err := os.ReadFile(s.path)
+	if err != nil {
+		return labSettings{}
+	}
+	var out labSettings
+	if json.Unmarshal(raw, &out) != nil {
+		return labSettings{}
+	}
+	return out
+}
+
+func (s *settingsStore) writeLocked(out labSettings) error {
+	if err := os.MkdirAll(filepath.Dir(s.path), 0o755); err != nil {
+		return err
+	}
+	raw, err := json.MarshalIndent(out, "", "  ")
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(s.path, raw, 0o644)
 }
 
 func (s *settingsStore) traineeName() (string, bool) {

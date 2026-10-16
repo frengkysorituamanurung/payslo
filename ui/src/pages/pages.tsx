@@ -3,6 +3,8 @@ import { useParams } from 'react-router-dom';
 import { MissionControl } from '../components/MissionControl';
 import { MentorPage } from './Mentor';
 import { LearnPage } from './Learn';
+import { ObservePage } from './Observe';
+import { SettingsPage } from './Settings';
 
 const KEYS = [
     'mission',
@@ -42,4 +44,12 @@ export function MentorRoute() {
 
 export function LearnRoute() {
     return <LearnPage />;
+}
+
+export function ObserveRoute() {
+    return <ObservePage />;
+}
+
+export function SettingsRoute() {
+    return <SettingsPage />;
 }

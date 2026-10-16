@@ -1,6 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import { useEvents } from '../hooks/useEvents';
 import { useMetricsSeries, useMetricsSummary, type MetricValue } from '../hooks/useLab';
+import { useSettings } from '../hooks/useIncidents';
 import { LOW_SAMPLE_RPS, fmtPct, fmtRps } from '../utils/format';
 import { MetricTile } from './MetricTile';
 import { EmptyState, ErrorState, StaleBanner } from './States';
@@ -9,6 +10,13 @@ import { TimeSeriesChart } from './TimeSeriesChart';
 
 function reloadPage(): void {
     window.location.reload();
+}
+
+function useLowSampleThreshold(): number {
+    const settings = useSettings();
+    const v = settings.data?.lowSampleThreshold;
+    if (typeof v === 'number' && Number.isFinite(v)) return v;
+    return LOW_SAMPLE_RPS;
 }
 
 function MetricPanel({
@@ -23,10 +31,11 @@ function MetricPanel({
     staleSince?: string | null;
 }) {
     const { t } = useTranslation();
+    const threshold = useLowSampleThreshold();
     if (metric === undefined) return <p>{t('common.loading')}</p>;
     if (metric.status === 'source_down') return <ErrorState onRetry={reloadPage} />;
     if (metric.status === 'no_data') return <EmptyState next={title} />;
-    const lowSample = metric.sampleRate !== null && metric.sampleRate < LOW_SAMPLE_RPS;
+    const lowSample = metric.sampleRate !== null && metric.sampleRate < threshold;
     return (
         <div>
             {metric.status === 'stale' && <StaleBanner lastData={metric.lastDataAt ?? '?'} />}

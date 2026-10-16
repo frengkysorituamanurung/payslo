@@ -604,3 +604,42 @@ konteks, opsi, keputusan, alasan. Opsi paling sederhana diutamakan.
   bisa curl admin bank-sim langsung — honor system).
 - Alasan: sesuai UI-SPEC §KEAMANAN 6; auth sungguhan di luar scope lab;
   rate limit mencegah brute-force casual.
+
+### 2026-10-16 — U7: deteksi gagal-embed Grafana via fetch probe
+- Konteks: `onError` iframe tidak andal untuk navigasi yang gagal, dan
+  `onLoad` bisa menyala untuk halaman error/X-Frame-Options. Acceptance
+  menuntut fallback yang muncul saat embedding salah dikonfigurasi.
+- Keputusan: `GrafanaFrame` memakai probe `fetch(src, {mode:'no-cors'})` —
+  rejection = network gagal -> panel fallback + tombol "Buka di tab baru"
+  (tombol ini SELALU tampil di bawah iframe untuk kasus X-Frame-Options
+  yang tak terdeteksi otomatis). Timeout 10 dtk sebagai jaring pengaman.
+- Alasan: sinyal jaringan eksplisit > event iframe yang ambigu; fallback
+  link permanen menutup celah deteksi.
+
+### 2026-10-16 — U7: ambang data-sedikit di server (settings)
+- Konteks: ambang 0.2/s sebelumnya konstanta UI (`LOW_SAMPLE_RPS`); spek
+  menuntut pengaturan ambang di halaman Pengaturan.
+- Keputusan: `PUT /api/v1/settings` menerima `lowSampleThreshold` opsional
+  (0..10, tersimpan di settings.json); MissionControl memakai nilai server
+  dengan fallback konstanta bila belum diatur. `Set` nama tidak menimpa
+  threshold (dan sebaliknya).
+- Alasan: satu sumber kebenaran; backward-compat (field opsional).
+
+### 2026-10-16 — U7: laporan diagnostik bebas secret by-construction + scan
+- Konteks: laporan boleh disalin ke mentor; tidak boleh ada token/password.
+- Keputusan: handler hanya menyusun field aman (nama, ref image/versi
+  buildinfo publik, reachable, latensi, key config TANPA nilai — bahkan
+  `config` selalu `{}`); kredensial Grafana hanya dipakai server-side untuk
+  basic-auth dan tidak pernah diserialkan. Test `TestDiagnosticsSecretFree`
+  memindai JSON untuk pola sensitif.
+- Alasan: tidak mengandalkan disiplin manual; pola yang dipindai
+  didokumentasikan di test.
+
+### 2026-10-16 — U7: regenerasi golden snapshot (menu Mentor hilang)
+- Konteks: `map-demo`/`mission-demo` golden menampilkan item nav "Mentor";
+  perilaku U6 yang benar menyembunyikannya untuk trainee. Bukan perubahan
+  visual U7 — golden basi sejak U6 (e2e U6 tidak menjalankan spec snapshot).
+- Keputusan: regenerasi via `--update-snapshots` setelah verifikasi gambar
+  aktual identik kecuali hilangnya item "Mentor".
+- Alasan: golden harus mencerminkan perilaku yang dimaksud; dicatat agar
+  tidak dikira regresi U7.

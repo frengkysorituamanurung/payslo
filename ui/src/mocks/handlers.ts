@@ -703,13 +703,119 @@ export const handlers = [
   }),
   http.get('*/api/v1/settings', () => HttpResponse.json(incidentState.settings)),
   http.put('*/api/v1/settings', async ({ request }) => {
-    const body = (await request.json()) as { traineeName?: string };
-    const name = (body.traineeName ?? '').trim();
-    if (name === '' || name.length > 64)
-      return problem(400, 'Pengaturan buruk', 'nama trainee 1..64 karakter');
-    incidentState.settings = { traineeName: name };
+    const body = (await request.json()) as { traineeName?: string; lowSampleThreshold?: number };
+    if (body.traineeName !== undefined) {
+      const name = body.traineeName.trim();
+      if (name === '' || name.length > 64)
+        return problem(400, 'Pengaturan buruk', 'nama trainee 1..64 karakter');
+      incidentState.settings.traineeName = name;
+    }
+    if (body.lowSampleThreshold !== undefined) {
+      const v = body.lowSampleThreshold;
+      if (!Number.isFinite(v) || v < 0 || v > 10)
+        return problem(400, 'Pengaturan buruk', 'ambang harus 0..10');
+      incidentState.settings.lowSampleThreshold = v;
+    }
     return HttpResponse.json(incidentState.settings);
   }),
+
+  // ------------------------------------------------------------------ U7 observability + diagnostik
+  http.get('*/api/v1/observe/status', () =>
+    HttpResponse.json({
+      services: [
+        { name: 'grafana', reachable: true, latencyMs: 3 },
+        { name: 'prometheus', reachable: true, latencyMs: 2 },
+        { name: 'alertmanager', reachable: true, latencyMs: 2 },
+        { name: 'ntfy', reachable: true, latencyMs: 4 },
+        {
+          name: 'loki',
+          reachable: false,
+          latencyMs: 1,
+          detail: 'profil obs-full tidak aktif (demo)',
+        },
+        {
+          name: 'tempo',
+          reachable: false,
+          latencyMs: 1,
+          detail: 'profil obs-full tidak aktif (demo)',
+        },
+      ],
+      dockerAvailable: false,
+      dockerNote: 'Docker tidak tersedia (mode demo)',
+      composeProfiles: { 'obs-full': false },
+      checkedAt: BASE,
+    }),
+  ),
+  http.get('*/api/v1/observe/grafana', () =>
+    HttpResponse.json({
+      url: 'http://127.0.0.1:3002',
+      kioskUrl: 'http://127.0.0.1:3002/d/payment-overview?orgId=1&kiosk',
+      dashboards: [
+        { title: 'Payment Overview', uid: 'payment-overview' },
+        { title: 'Provider Health', uid: 'provider-health' },
+      ],
+      embeddingAllowed: true,
+    }),
+  ),
+  http.get('*/api/v1/observe/annotations', () =>
+    HttpResponse.json({
+      annotations: [
+        { id: 1, time: BASE, text: 'gateway deploy good via lab', tags: ['deploy', 'gateway'] },
+        { id: 2, time: BASE, text: 'traffic rate=6/s', tags: ['traffic'] },
+      ],
+    }),
+  ),
+  http.get('*/api/v1/observe/prometheus/alerts', () =>
+    HttpResponse.json({
+      alerts: [
+        {
+          labels: {
+            alertname: 'PaySLOBurnRateHigh',
+            slo: 'payment-success-rate',
+            severity: 'page',
+          },
+          state: 'firing',
+          activeAt: BASE,
+        },
+      ],
+    }),
+  ),
+  http.get('*/api/v1/observe/prometheus/rules', () =>
+    HttpResponse.json({
+      groups: [{ name: 'payslo-payment-success-rate', rules: ['PaySLOBurnRateHigh'] }],
+    }),
+  ),
+  http.get('*/api/v1/observe/alertmanager', () =>
+    HttpResponse.json({
+      alerts: [{ labels: { alertname: 'PaySLOBurnRateHigh', severity: 'page' }, state: 'active' }],
+    }),
+  ),
+  http.get('*/api/v1/observe/ntfy/history', () =>
+    HttpResponse.json({
+      source: 'mock',
+      messages: [
+        {
+          id: 'm1',
+          time: BASE,
+          topic: 'payslo-lab',
+          message: 'incident opened: payment-success-rate (page)',
+        },
+      ],
+    }),
+  ),
+  http.get('*/api/v1/diagnostics', () =>
+    HttpResponse.json({
+      services: [
+        { name: 'labserve', version: 'dev-demo', reachable: true, config: {} },
+        { name: 'grafana', version: 'unknown', reachable: true, config: {} },
+        { name: 'prometheus', version: 'unknown', reachable: true, config: {} },
+        { name: 'postgres', version: 'unknown', reachable: false, config: {} },
+      ],
+      docker: { available: false, note: 'Docker tidak tersedia (mode demo)' },
+      checkedAt: BASE,
+      generatedBy: 'labserve',
+    }),
+  ),
 
   // ------------------------------------------------------------------ U6 mentor + belajar
   http.post('*/api/v1/mentor/unlock', async ({ request }) => {
@@ -897,7 +1003,7 @@ const incidentState: {
   approvals: Approval[];
   seq: number;
   bcaDisabled: boolean;
-  settings: { traineeName: string };
+  settings: { traineeName: string; lowSampleThreshold?: number };
   postmortem: Record<string, Postmortem>;
 } = {
   timeline: {},

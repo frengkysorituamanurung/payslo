@@ -414,5 +414,50 @@
     },
     "glossaryTitle": "Glossary",
     "empty": "Curriculum not found."
+  },
+  "observe": {
+    "tab": {
+      "grafana": "Grafana",
+      "prometheus": "Prometheus",
+      "alertmanager": "Alertmanager",
+      "ntfy": "ntfy"
+    },
+    "obsFullOff": "obs-full profile is off",
+    "obsFullOffHint": "Loki/Tempo/Alloy are down: log & trace features are disabled. Enable the obs-full profile if needed (see troubleshooting). Log/trace links on the Payments page stay hidden until the profile is up.",
+    "dashboard": "Dashboard",
+    "noDashboards": "No provisioned dashboards.",
+    "iframeLoading": "Loading Grafana dashboard…",
+    "iframeBlocked": "Grafana embed blocked or failed to load.",
+    "iframeBlockedHint": "Common cause: GF_SECURITY_ALLOW_EMBEDDING=false in Grafana or X-Frame-Options headers. Open the dashboard in a new tab as fallback.",
+    "openNewTab": "Open in new tab",
+    "firingAlerts": "Firing alerts",
+    "noAlerts": "No active alerts.",
+    "unknownAlert": "unnamed alert",
+    "promRules": "payslo-owned rules",
+    "noNtfy": "No notifications sent yet.",
+    "ntfySource": "Source: {{source}}",
+    "annotationsTitle": "Deploy/chaos annotations",
+    "noAnnotations": "No annotations in this range."
+  },
+  "settings": {
+    "generalTitle": "Settings",
+    "traineeName": "Trainee name",
+    "traineeNameHint": "Name is used as the default approver identity.",
+    "threshold": "Low-sample threshold (req/s)",
+    "thresholdHint": "Below this rate, ratios are flagged “Low sample, ratio unstable” (default 0.2).",
+    "thresholdInvalid": "Threshold must be a number 0..10.",
+    "save": "Save settings",
+    "saved": "Settings saved.",
+    "diagnosticsTitle": "Diagnostics",
+    "services": "Services",
+    "resources": "Resources (docker stats)",
+    "container": "Container",
+    "cpu": "CPU",
+    "memory": "Memory",
+    "dockerUnavailable": "Docker is unavailable.",
+    "reportTitle": "Diagnostics report",
+    "reportHint": "Secret-free: versions/connections/resources only. Safe to paste to your mentor.",
+    "copyReport": "Copy diagnostics report",
+    "copied": "Copied."
   }
 }

@@ -61,7 +61,7 @@ func (s *server) handleIncidentNote(w http.ResponseWriter, r *http.Request) {
 		writeIncidentError(w, err, "Catatan gagal disimpan")
 		return
 	}
-	writeJSON(w, http.StatusCreated, map[string]any{"ok": true, "incident_id": id})
+	writeJSON(w, http.StatusCreated, map[string]any{"ok": true, "incidentId": id})
 }
 
 func (s *server) handleIncidentApprovals(w http.ResponseWriter, r *http.Request) {
@@ -224,18 +224,34 @@ func (s *server) handleSettingsGet(w http.ResponseWriter, r *http.Request) {
 
 func (s *server) handleSettingsPut(w http.ResponseWriter, r *http.Request) {
 	var body struct {
-		TraineeName string `json:"traineeName"`
+		TraineeName        *string  `json:"traineeName"`
+		LowSampleThreshold *float64 `json:"lowSampleThreshold"`
 	}
 	if err := decodeStrict(r, &body); err != nil {
 		writeProblem(w, http.StatusBadRequest, "Body buruk", err.Error())
 		return
 	}
 	actor := actorOf(r)
-	out, err := s.settings.Set(body.TraineeName)
-	if err != nil {
-		writeProblem(w, http.StatusBadRequest, "Pengaturan buruk", err.Error())
-		return
+	out := s.settings.Get()
+	changed := []string{}
+	if body.TraineeName != nil {
+		var err error
+		out, err = s.settings.Set(*body.TraineeName)
+		if err != nil {
+			writeProblem(w, http.StatusBadRequest, "Pengaturan buruk", err.Error())
+			return
+		}
+		changed = append(changed, "traineeName="+out.TraineeName)
 	}
-	s.audit.record(auditEntry{Actor: actor, Action: "settings.set", Target: "traineeName", Detail: out.TraineeName})
+	if body.LowSampleThreshold != nil {
+		var err error
+		out, err = s.settings.SetThreshold(*body.LowSampleThreshold)
+		if err != nil {
+			writeProblem(w, http.StatusBadRequest, "Pengaturan buruk", err.Error())
+			return
+		}
+		changed = append(changed, "lowSampleThreshold")
+	}
+	s.audit.record(auditEntry{Actor: actor, Action: "settings.set", Target: "settings", Detail: strings.Join(changed, " ")})
 	writeJSON(w, http.StatusOK, out)
 }

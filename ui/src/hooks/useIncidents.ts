@@ -209,13 +209,15 @@ export function useSettings(): UseQueryResult<LabSettings, ApiError> {
   });
 }
 
-export function useSaveSettings(): UseMutationResult<LabSettings, ApiError, string> {
+export function useSaveSettings(): UseMutationResult<
+  LabSettings,
+  ApiError,
+  { traineeName?: string; lowSampleThreshold?: number }
+> {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (traineeName: string) => {
-      const { data, error, response } = await api.PUT('/api/v1/settings', {
-        body: { traineeName },
-      });
+    mutationFn: async (body) => {
+      const { data, error, response } = await api.PUT('/api/v1/settings', { body });
       if (data === undefined) throwProblem(error, response.status);
       return data;
     },

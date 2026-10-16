@@ -414,5 +414,50 @@
     },
     "glossaryTitle": "Glosarium",
     "empty": "Kurikulum tidak ditemukan."
+  },
+  "observe": {
+    "tab": {
+      "grafana": "Grafana",
+      "prometheus": "Prometheus",
+      "alertmanager": "Alertmanager",
+      "ntfy": "ntfy"
+    },
+    "obsFullOff": "Profil obs-full tidak aktif",
+    "obsFullOffHint": "Loki/Tempo/Alloy mati: fitur log & trace dinonaktifkan. Nyalakan dengan profil obs-full bila perlu (lihat troubleshooting). Tautan log/trace di halaman Pembayaran disembunyikan sampai profil aktif.",
+    "dashboard": "Dasbor",
+    "noDashboards": "Tidak ada dasbor terprovision.",
+    "iframeLoading": "Memuat dasbor Grafana…",
+    "iframeBlocked": "Embed Grafana diblokir atau tak termuat.",
+    "iframeBlockedHint": "Penyebab umum: GF_SECURITY_ALLOW_EMBEDDING=false di Grafana atau header X-Frame-Options. Buka dasbor di tab baru sebagai fallback.",
+    "openNewTab": "Buka di tab baru",
+    "firingAlerts": "Alert menyala",
+    "noAlerts": "Tidak ada alert aktif.",
+    "unknownAlert": "alert tak bernama",
+    "promRules": "Rules milik payslo",
+    "noNtfy": "Belum ada notifikasi terkirim.",
+    "ntfySource": "Sumber: {{source}}",
+    "annotationsTitle": "Anotasi deploy/chaos",
+    "noAnnotations": "Belum ada anotasi pada rentang ini."
+  },
+  "settings": {
+    "generalTitle": "Pengaturan",
+    "traineeName": "Nama trainee",
+    "traineeNameHint": "Nama dipakai sebagai identitas approver default.",
+    "threshold": "Ambang data-sedikit (req/s)",
+    "thresholdHint": "Di bawah laju ini, rasio ditandai “Data sedikit, rasio tidak stabil” (default 0.2).",
+    "thresholdInvalid": "Ambang harus angka 0..10.",
+    "save": "Simpan pengaturan",
+    "saved": "Pengaturan tersimpan.",
+    "diagnosticsTitle": "Diagnostik",
+    "services": "Layanan",
+    "resources": "Resource (docker stats)",
+    "container": "Kontainer",
+    "cpu": "CPU",
+    "memory": "Memori",
+    "dockerUnavailable": "Docker tidak tersedia.",
+    "reportTitle": "Laporan diagnostik",
+    "reportHint": "Bebas secret: hanya versi/koneksi/resource. Aman disalin ke mentor.",
+    "copyReport": "Salin laporan diagnostik",
+    "copied": "Disalin."
   }
 }

@@ -535,6 +535,148 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/observe/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Status koneksi sumber observability + profil compose aktif
+         * @description Jujur per sumber: reachable=true/false + latencyMs. Profil compose (obs-full: loki/tempo/alloy) mati -> fitur log/trace dinonaktifkan dengan penjelasan (bukan error). Docker tidak tersedia -> field dockerAvailable=false (bukan 5xx).
+         */
+        get: operations["getObserveStatus"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/observe/grafana": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Info embed Grafana (URL kiosk + daftar dashboard) */
+        get: operations["getGrafanaEmbed"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/observe/annotations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Anotasi Grafana (deploy/chaos) — hanya yang boleh dilihat sesuai mode */
+        get: operations["getAnnotations"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/observe/prometheus/alerts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Alert aktif dari Prometheus (/api/v1/alerts) */
+        get: operations["getPrometheusAlerts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/observe/prometheus/rules": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Rules Prometheus (/api/v1/rules) milik payslo */
+        get: operations["getPrometheusRules"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/observe/alertmanager": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Alert Alertmanager + status suppressor */
+        get: operations["getAlertmanagerState"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/observe/ntfy/history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Riwayat notifikasi ntfy terkirim (topik payslo-lab) */
+        get: operations["getNtfyHistory"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/diagnostics": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Laporan diagnostik (versi service, koneksi, resource) — BEBAS SECRET
+         * @description Tidak ada token/password/env sensitif (di-scan dengan pola di u7_test.go). Docker stats --no-stream bila tersedia; bila Docker tidak ada -> dockerAvailable=false + pesan jujur (bukan error).
+         */
+        get: operations["getDiagnostics"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/mentor/unlock": {
         parameters: {
             query?: never;
@@ -1317,6 +1459,108 @@ export interface components {
         };
         LabSettings: {
             traineeName?: string;
+            /** @description Ambang laju sampel (req/s) untuk label "data sedikit" (default server 0.2 bila tak di-set) */
+            lowSampleThreshold?: number;
+        };
+        ServiceStatus: {
+            name: string;
+            reachable: boolean;
+            latencyMs: number;
+            detail?: string;
+        };
+        ObserveStatus: {
+            services: components["schemas"]["ServiceStatus"][];
+            dockerAvailable: boolean;
+            dockerNote?: string;
+            /** @description true = profil aktif (obs-full: loki/tempo/alloy) */
+            composeProfiles: {
+                [key: string]: boolean;
+            };
+            /** Format: date-time */
+            checkedAt: string;
+        };
+        GrafanaEmbedInfo: {
+            url: string;
+            kioskUrl: string;
+            dashboards: {
+                title: string;
+                uid: string;
+            }[];
+            /** @description false = CSP/allow-embedding belum diizinkan (fallback) */
+            embeddingAllowed: boolean;
+        };
+        Annotation: {
+            id: number;
+            /** Format: date-time */
+            time: string;
+            text: string;
+            tags: string[];
+        };
+        AnnotationList: {
+            annotations: components["schemas"]["Annotation"][];
+        };
+        PrometheusAlert: {
+            labels: {
+                [key: string]: string;
+            };
+            state: string;
+            /** Format: date-time */
+            activeAt: string;
+        };
+        PrometheusAlertList: {
+            alerts: components["schemas"]["PrometheusAlert"][];
+        };
+        PrometheusRuleList: {
+            groups: {
+                name: string;
+                rules: string[];
+            }[];
+        };
+        AlertmanagerState: {
+            alerts: {
+                labels: {
+                    [key: string]: string;
+                };
+                state: string;
+            }[];
+        };
+        NtfyMessage: {
+            id: string;
+            /** Format: date-time */
+            time: string;
+            topic: string;
+            message: string;
+        };
+        NtfyHistory: {
+            messages: components["schemas"]["NtfyMessage"][];
+            /** @description ntfy | mock (mode demo) */
+            source: string;
+        };
+        DiagnosticsReport: {
+            services: components["schemas"]["ServiceDiagnostics"][];
+            docker: {
+                available: boolean;
+                note?: string;
+                stats?: {
+                    name: string;
+                    cpuPerc: string;
+                    memUsage: string;
+                    memPerc: string;
+                }[];
+            };
+            /** Format: date-time */
+            checkedAt: string;
+            /** @description lab serve version (tanpa secret) */
+            generatedBy: string;
+        };
+        ServiceDiagnostics: {
+            name: string;
+            version: string;
+            reachable: boolean;
+            /** @description Hanya nama env yang aman (tanpa nilai secret) */
+            config: {
+                [key: string]: string;
+            };
         };
         /** @description RFC 9457 application/problem+json */
         Problem: {
@@ -2411,6 +2655,169 @@ export interface operations {
                 };
             };
             400: components["responses"]["Problem"];
+        };
+    };
+    getObserveStatus: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Status sumber observability */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ObserveStatus"];
+                };
+            };
+        };
+    };
+    getGrafanaEmbed: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Info embed Grafana */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GrafanaEmbedInfo"];
+                };
+            };
+        };
+    };
+    getAnnotations: {
+        parameters: {
+            query?: {
+                from?: number;
+                to?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Anotasi (mode trainee hanya melihat yang bukan chaos) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AnnotationList"];
+                };
+            };
+        };
+    };
+    getPrometheusAlerts: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Alert aktif */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PrometheusAlertList"];
+                };
+            };
+        };
+    };
+    getPrometheusRules: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Grup rules */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PrometheusRuleList"];
+                };
+            };
+        };
+    };
+    getAlertmanagerState: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Alert Alertmanager */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AlertmanagerState"];
+                };
+            };
+        };
+    };
+    getNtfyHistory: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Riwayat notifikasi (terbaru dulu, maks 50) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NtfyHistory"];
+                };
+            };
+        };
+    };
+    getDiagnostics: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Laporan diagnostik */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DiagnosticsReport"];
+                };
+            };
         };
     };
     unlockMentor: {

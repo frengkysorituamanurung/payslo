@@ -63,3 +63,18 @@ atau ubah mapping di `docker-compose.yml`. Port lab: 3000 (gateway), 3001 (admin
 - Burn-rate butuh jendela penuh (5m) + `for` terpenuhi; TTL transaksi default
   600 dtk (skenario memakai 60 dtk agar cepat). Tunggu 4–6 menit pasca-trigger.
 - Pastikan loadgen jalan (sumber sampel) dan payslo service up (insiden).
+
+## Halaman Observability kosong / log & trace nonaktif (profil obs-full mati)
+Gejala: banner "Profil obs-full tidak aktif" di /observe; tautan log/trace
+di /payments disembunyikan dengan penjelasan.
+Solusi: nyalakan `make up-obs-full` (loki, tempo, alloy), lalu muat ulang
+/observe. Ini perilaku yang dimaksud (degradasi anggun), bukan error —
+`GET /api/v1/observe/status` melaporkan `composeProfiles.obs-full: false`.
+
+## Embed Grafana diblokir (fallback "Buka di tab baru")
+Gejala: panel fallback di /observe alih-alih dasbor tertanam.
+Penyebab umum: `GF_SECURITY_ALLOW_EMBEDDING=false` (compose default `true`;
+cek `docker compose config | grep ALLOW_EMBEDDING`) atau header
+X-Frame-Options dari reverse proxy di depan Grafana.
+Solusi: pastikan compose memakai nilai default repo, restart grafana, lalu
+muat ulang. Fallback "Buka di tab baru" selalu tersedia sementara itu.

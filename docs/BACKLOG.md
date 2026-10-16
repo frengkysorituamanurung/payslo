@@ -28,6 +28,10 @@ Rincian 10 isu awal: `docs/GOOD_FIRST_ISSUES.md`.
 - [x] Halaman: Mission Control (U1), Peta Arsitektur (U0), Pembayaran +
       Chaos & Kontrol (U2), SLO Center (U3), Insiden (U4). Sisanya masih
       placeholder.
+- [x] Halaman U7: Observability (/observe: iframe Grafana kiosk + fallback,
+      tab Prometheus/Alertmanager/ntfy, anotasi filter-mode) + Pengaturan &
+      Diagnostik (/settings: nama/bahasa/tema/ambang, laporan bebas secret,
+      docker stats graceful). Endpoint Go: observe/* + /diagnostics.
 - [x] Komponen UI-SPEC inti terpakai: TimeSeriesChart (U1), Timeline (U2),
       DiffViewer + YamlEditor/CodeMirror (U3), ApprovalCard + toast + badge (U4).
 - [ ] Komponen lanjutan UI-SPEC: ErrorBudgetBar, BurnRateGauge, ServiceNode,

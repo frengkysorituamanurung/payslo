@@ -143,6 +143,26 @@ export type GlossaryTerm =
 export type LearnProgressItem =
   paths['/api/v1/learn/progress']['get']['responses']['200']['content']['application/json']['items'][number];
 
+// U7 observability + diagnostik.
+export type ObserveStatus =
+  paths['/api/v1/observe/status']['get']['responses']['200']['content']['application/json'];
+export type ObserveService = ObserveStatus['services'][number];
+export type GrafanaEmbedInfo =
+  paths['/api/v1/observe/grafana']['get']['responses']['200']['content']['application/json'];
+export type Annotation =
+  paths['/api/v1/observe/annotations']['get']['responses']['200']['content']['application/json']['annotations'][number];
+export type PrometheusAlert =
+  paths['/api/v1/observe/prometheus/alerts']['get']['responses']['200']['content']['application/json']['alerts'][number];
+export type PrometheusRuleGroup =
+  paths['/api/v1/observe/prometheus/rules']['get']['responses']['200']['content']['application/json']['groups'][number];
+export type AlertmanagerAlert =
+  paths['/api/v1/observe/alertmanager']['get']['responses']['200']['content']['application/json']['alerts'][number];
+export type NtfyHistory =
+  paths['/api/v1/observe/ntfy/history']['get']['responses']['200']['content']['application/json'];
+export type NtfyMessage = NtfyHistory['messages'][number];
+export type DiagnosticsReport =
+  paths['/api/v1/diagnostics']['get']['responses']['200']['content']['application/json'];
+
 declare global {
   interface Window {
     __LAB_TOKEN__?: string;

@@ -831,6 +831,114 @@ paths:
                 $ref: '#/components/schemas/LabSettings'
         '400':
           $ref: '#/components/responses/Problem'
+  /api/v1/observe/status:
+    get:
+      operationId: getObserveStatus
+      summary: Status koneksi sumber observability + profil compose aktif
+      description: >-
+        Jujur per sumber: reachable=true/false + latencyMs. Profil compose
+        (obs-full: loki/tempo/alloy) mati -> fitur log/trace dinonaktifkan
+        dengan penjelasan (bukan error). Docker tidak tersedia -> field
+        dockerAvailable=false (bukan 5xx).
+      responses:
+        '200':
+          description: Status sumber observability
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ObserveStatus'
+  /api/v1/observe/grafana:
+    get:
+      operationId: getGrafanaEmbed
+      summary: Info embed Grafana (URL kiosk + daftar dashboard)
+      responses:
+        '200':
+          description: Info embed Grafana
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GrafanaEmbedInfo'
+  /api/v1/observe/annotations:
+    get:
+      operationId: getAnnotations
+      summary: Anotasi Grafana (deploy/chaos) — hanya yang boleh dilihat sesuai mode
+      parameters:
+        - name: from
+          in: query
+          schema:
+            type: integer
+            description: epoch detik (default 1 jam lalu)
+        - name: to
+          in: query
+          schema:
+            type: integer
+            description: epoch detik (default sekarang)
+      responses:
+        '200':
+          description: Anotasi (mode trainee hanya melihat yang bukan chaos)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AnnotationList'
+  /api/v1/observe/prometheus/alerts:
+    get:
+      operationId: getPrometheusAlerts
+      summary: Alert aktif dari Prometheus (/api/v1/alerts)
+      responses:
+        '200':
+          description: Alert aktif
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PrometheusAlertList'
+  /api/v1/observe/prometheus/rules:
+    get:
+      operationId: getPrometheusRules
+      summary: Rules Prometheus (/api/v1/rules) milik payslo
+      responses:
+        '200':
+          description: Grup rules
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PrometheusRuleList'
+  /api/v1/observe/alertmanager:
+    get:
+      operationId: getAlertmanagerState
+      summary: Alert Alertmanager + status suppressor
+      responses:
+        '200':
+          description: Alert Alertmanager
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AlertmanagerState'
+  /api/v1/observe/ntfy/history:
+    get:
+      operationId: getNtfyHistory
+      summary: Riwayat notifikasi ntfy terkirim (topik payslo-lab)
+      responses:
+        '200':
+          description: Riwayat notifikasi (terbaru dulu, maks 50)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NtfyHistory'
+  /api/v1/diagnostics:
+    get:
+      operationId: getDiagnostics
+      summary: Laporan diagnostik (versi service, koneksi, resource) — BEBAS SECRET
+      description: >-
+        Tidak ada token/password/env sensitif (di-scan dengan pola di u7_test.go).
+        Docker stats --no-stream bila tersedia; bila Docker tidak ada ->
+        dockerAvailable=false + pesan jujur (bukan error).
+      responses:
+        '200':
+          description: Laporan diagnostik
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DiagnosticsReport'
   /api/v1/mentor/unlock:
     post:
       operationId: unlockMentor
@@ -2311,6 +2419,233 @@ components:
       properties:
         traineeName:
           type: string
+        lowSampleThreshold:
+          type: number
+          minimum: 0
+          maximum: 10
+          description: Ambang laju sampel (req/s) untuk label "data sedikit" (default server 0.2 bila tak di-set)
+    ServiceStatus:
+      type: object
+      required: [name, reachable, latencyMs]
+      additionalProperties: false
+      properties:
+        name:
+          type: string
+        reachable:
+          type: boolean
+        latencyMs:
+          type: integer
+        detail:
+          type: string
+    ObserveStatus:
+      type: object
+      required: [services, dockerAvailable, composeProfiles, checkedAt]
+      additionalProperties: false
+      properties:
+        services:
+          type: array
+          items:
+            $ref: '#/components/schemas/ServiceStatus'
+        dockerAvailable:
+          type: boolean
+        dockerNote:
+          type: string
+        composeProfiles:
+          type: object
+          additionalProperties:
+            type: boolean
+          description: 'true = profil aktif (obs-full: loki/tempo/alloy)'
+        checkedAt:
+          type: string
+          format: date-time
+    GrafanaEmbedInfo:
+      type: object
+      required: [url, kioskUrl, dashboards, embeddingAllowed]
+      additionalProperties: false
+      properties:
+        url:
+          type: string
+        kioskUrl:
+          type: string
+        dashboards:
+          type: array
+          items:
+            type: object
+            required: [title, uid]
+            additionalProperties: false
+            properties:
+              title:
+                type: string
+              uid:
+                type: string
+        embeddingAllowed:
+          type: boolean
+          description: false = CSP/allow-embedding belum diizinkan (fallback)
+    Annotation:
+      type: object
+      required: [id, time, text, tags]
+      additionalProperties: false
+      properties:
+        id:
+          type: integer
+        time:
+          type: string
+          format: date-time
+        text:
+          type: string
+        tags:
+          type: array
+          items:
+            type: string
+    AnnotationList:
+      type: object
+      required: [annotations]
+      additionalProperties: false
+      properties:
+        annotations:
+          type: array
+          items:
+            $ref: '#/components/schemas/Annotation'
+    PrometheusAlert:
+      type: object
+      required: [labels, state, activeAt]
+      additionalProperties: false
+      properties:
+        labels:
+          type: object
+          additionalProperties:
+            type: string
+        state:
+          type: string
+        activeAt:
+          type: string
+          format: date-time
+    PrometheusAlertList:
+      type: object
+      required: [alerts]
+      additionalProperties: false
+      properties:
+        alerts:
+          type: array
+          items:
+            $ref: '#/components/schemas/PrometheusAlert'
+    PrometheusRuleList:
+      type: object
+      required: [groups]
+      additionalProperties: false
+      properties:
+        groups:
+          type: array
+          items:
+            type: object
+            required: [name, rules]
+            additionalProperties: false
+            properties:
+              name:
+                type: string
+              rules:
+                type: array
+                items:
+                  type: string
+    AlertmanagerState:
+      type: object
+      required: [alerts]
+      additionalProperties: false
+      properties:
+        alerts:
+          type: array
+          items:
+            type: object
+            required: [labels, state]
+            additionalProperties: false
+            properties:
+              labels:
+                type: object
+                additionalProperties:
+                  type: string
+              state:
+                type: string
+    NtfyMessage:
+      type: object
+      required: [id, time, topic, message]
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+        time:
+          type: string
+          format: date-time
+        topic:
+          type: string
+        message:
+          type: string
+    NtfyHistory:
+      type: object
+      required: [messages, source]
+      additionalProperties: false
+      properties:
+        messages:
+          type: array
+          items:
+            $ref: '#/components/schemas/NtfyMessage'
+        source:
+          type: string
+          description: 'ntfy | mock (mode demo)'
+    DiagnosticsReport:
+      type: object
+      required: [services, docker, checkedAt, generatedBy]
+      additionalProperties: false
+      properties:
+        services:
+          type: array
+          items:
+            $ref: '#/components/schemas/ServiceDiagnostics'
+        docker:
+          type: object
+          required: [available]
+          additionalProperties: false
+          properties:
+            available:
+              type: boolean
+            note:
+              type: string
+            stats:
+              type: array
+              items:
+                type: object
+                required: [name, cpuPerc, memUsage, memPerc]
+                additionalProperties: false
+                properties:
+                  name:
+                    type: string
+                  cpuPerc:
+                    type: string
+                  memUsage:
+                    type: string
+                  memPerc:
+                    type: string
+        checkedAt:
+          type: string
+          format: date-time
+        generatedBy:
+          type: string
+          description: lab serve version (tanpa secret)
+    ServiceDiagnostics:
+      type: object
+      required: [name, version, reachable, config]
+      additionalProperties: false
+      properties:
+        name:
+          type: string
+        version:
+          type: string
+        reachable:
+          type: boolean
+        config:
+          type: object
+          additionalProperties:
+            type: string
+          description: Hanya nama env yang aman (tanpa nilai secret)
     Problem:
       type: object
       description: RFC 9457 application/problem+json

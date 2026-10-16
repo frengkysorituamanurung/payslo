@@ -86,6 +86,7 @@ type postmortemSvc interface {
 type settingsSvc interface {
 	Get() labSettings
 	Set(name string) (labSettings, error)
+	SetThreshold(v float64) (labSettings, error)
 }
 
 type ctxKey string
@@ -200,6 +201,10 @@ func (p *demoSettingsSvc) Set(name string) (labSettings, error) {
 	return p.d.SetSettings(name)
 }
 
+func (p *demoSettingsSvc) SetThreshold(v float64) (labSettings, error) {
+	return p.d.SetThreshold(v)
+}
+
 // registerRoutes memetakan route ke handler dan mencatatnya di s.routes agar
 // test kontrak bisa membandingkan dengan api/openapi.yaml.
 func (s *server) registerRoutes() {
@@ -263,6 +268,15 @@ func (s *server) registerRoutes() {
 	route("GET /api/v1/learn/glossary", s.handleGlossary)
 	route("GET /api/v1/learn/progress", s.handleLearnProgressGet)
 	route("PUT /api/v1/learn/progress", s.handleLearnProgressPut)
+	// U7 observability + diagnostik.
+	route("GET /api/v1/observe/status", s.handleObserveStatus)
+	route("GET /api/v1/observe/grafana", s.handleGrafanaEmbed)
+	route("GET /api/v1/observe/annotations", s.handleAnnotations)
+	route("GET /api/v1/observe/prometheus/alerts", s.handlePrometheusAlerts)
+	route("GET /api/v1/observe/prometheus/rules", s.handlePrometheusRules)
+	route("GET /api/v1/observe/alertmanager", s.handleAlertmanager)
+	route("GET /api/v1/observe/ntfy/history", s.handleNtfyHistory)
+	route("GET /api/v1/diagnostics", s.handleDiagnostics)
 	s.mux.HandleFunc("/", s.handleWeb)
 }
 

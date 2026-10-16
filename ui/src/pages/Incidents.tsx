@@ -570,11 +570,14 @@ function SettingsPanel() {
                     <button
                         type="button"
                         onClick={() => {
-                            save.mutate(shown.trim(), {
-                                onSuccess: () => {
-                                    setName(null);
+                            save.mutate(
+                                { traineeName: shown.trim() },
+                                {
+                                    onSuccess: () => {
+                                        setName(null);
+                                    },
                                 },
-                            });
+                            );
                         }}
                         disabled={save.isPending || shown.trim() === ''}
                     >

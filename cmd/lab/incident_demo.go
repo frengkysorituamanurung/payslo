@@ -245,7 +245,17 @@ func (d *demoIncidents) SetSettings(name string) (labSettings, error) {
 	}
 	d.mu.Lock()
 	defer d.mu.Unlock()
-	d.settings = labSettings{TraineeName: clean}
+	d.settings.TraineeName = clean
+	return d.settings, nil
+}
+
+func (d *demoIncidents) SetThreshold(v float64) (labSettings, error) {
+	if err := validateLowSampleThreshold(v); err != nil {
+		return labSettings{}, err
+	}
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	d.settings.LowSampleThreshold = &v
 	return d.settings, nil
 }
 

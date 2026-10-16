@@ -17,6 +17,10 @@ ditangani:
 
 Jangan sebut PIN di depan trainee. Ganti PIN lewat `.env` bila perlu.
 
+Anotasi Grafana (U7): mentor melihat SEMUA anotasi deploy/chaos/traffic di
+/observe; trainee hanya melihat yang bukan chaos (filter server-side).
+Gunakan ini untuk memverifikasi kapan chaos disuntik tanpa membocorkannya.
+
 ## Daftar cacat sengaja (P3 — JANGAN dibocorkan di depan)
 
 1. **Callback duplikat tidak di-dedup** gateway (`// LAB-FLAW:` di
