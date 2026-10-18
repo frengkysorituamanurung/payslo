@@ -19,6 +19,7 @@ import { ConfirmDialog } from '../components/ConfirmDialog';
 import { DiffViewer } from '../components/DiffViewer';
 import { SloEditor } from '../components/SloEditor';
 import { EmptyState, ErrorState } from '../components/States';
+import { TableScroll } from '../components/TableScroll';
 
 function Card({ title, children }: { title: string; children: React.ReactNode }) {
     return (
@@ -162,61 +163,65 @@ function SloDetailPanel({ detail }: { detail: SloDetail }) {
             </p>
 
             <h3>{t('slo.burnTitle')}</h3>
-            <table style={{ borderCollapse: 'collapse', width: '100%' }}>
-                <thead>
-                    <tr>
-                        <th scope="col">{t('slo.burnLong')}</th>
-                        <th scope="col">{t('slo.burnShort')}</th>
-                        <th scope="col">{t('slo.burnRate')}</th>
-                        <th scope="col">{t('slo.burnThreshold')}</th>
-                        <th scope="col">{t('slo.severity')}</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {detail.burnRates.map((b, i) => (
-                        <tr key={`b${b.longWindow}-${b.shortWindow}-${String(i)}`}>
-                            <td>{b.longWindow}</td>
-                            <td>{b.shortWindow}</td>
-                            <td>{b.burnRate}×</td>
-                            <td>{((1 - m.objective) * b.burnRate * 100).toFixed(3)}%</td>
-                            <td>{b.severity}</td>
+            <TableScroll label={t('slo.burnTitle')}>
+                <table style={{ borderCollapse: 'collapse', width: '100%' }}>
+                    <thead>
+                        <tr>
+                            <th scope="col">{t('slo.burnLong')}</th>
+                            <th scope="col">{t('slo.burnShort')}</th>
+                            <th scope="col">{t('slo.burnRate')}</th>
+                            <th scope="col">{t('slo.burnThreshold')}</th>
+                            <th scope="col">{t('slo.severity')}</th>
                         </tr>
-                    ))}
-                </tbody>
-            </table>
+                    </thead>
+                    <tbody>
+                        {detail.burnRates.map((b, i) => (
+                            <tr key={`b${b.longWindow}-${b.shortWindow}-${String(i)}`}>
+                                <td>{b.longWindow}</td>
+                                <td>{b.shortWindow}</td>
+                                <td>{b.burnRate}×</td>
+                                <td>{((1 - m.objective) * b.burnRate * 100).toFixed(3)}%</td>
+                                <td>{b.severity}</td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </TableScroll>
 
             <h3>{t('slo.deployTitle')}</h3>
-            <table style={{ borderCollapse: 'collapse', width: '100%' }}>
-                <thead>
-                    <tr>
-                        <th scope="col">{t('slo.connection')}</th>
-                        <th scope="col">{t('slo.backend')}</th>
-                        <th scope="col">{t('slo.status')}</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {detail.deployment.map((d) => (
-                        <tr key={d.connection}>
-                            <td>{d.connection}</td>
-                            <td>{d.backend}</td>
-                            <td>
-                                <DeployBadge status={d.status} />
-                                {d.detail !== undefined && d.detail !== '' && (
-                                    <span
-                                        style={{
-                                            display: 'block',
-                                            fontSize: 12,
-                                            color: 'var(--text-muted)',
-                                        }}
-                                    >
-                                        {d.detail}
-                                    </span>
-                                )}
-                            </td>
+            <TableScroll label={t('slo.deployTitle')}>
+                <table style={{ borderCollapse: 'collapse', width: '100%' }}>
+                    <thead>
+                        <tr>
+                            <th scope="col">{t('slo.connection')}</th>
+                            <th scope="col">{t('slo.backend')}</th>
+                            <th scope="col">{t('slo.status')}</th>
                         </tr>
-                    ))}
-                </tbody>
-            </table>
+                    </thead>
+                    <tbody>
+                        {detail.deployment.map((d) => (
+                            <tr key={d.connection}>
+                                <td>{d.connection}</td>
+                                <td>{d.backend}</td>
+                                <td>
+                                    <DeployBadge status={d.status} />
+                                    {d.detail !== undefined && d.detail !== '' && (
+                                        <span
+                                            style={{
+                                                display: 'block',
+                                                fontSize: 12,
+                                                color: 'var(--text-muted)',
+                                            }}
+                                        >
+                                            {d.detail}
+                                        </span>
+                                    )}
+                                </td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </TableScroll>
 
             <h3>{t('slo.alertsTitle')}</h3>
             {detail.alerts.length === 0 ? (
@@ -471,24 +476,26 @@ function CapabilitiesPanel() {
             {caps.isPending && <p>{t('common.loading')}</p>}
             {caps.isError && <ErrorState onRetry={() => void caps.refetch()} />}
             {caps.isSuccess && (
-                <table style={{ borderCollapse: 'collapse', width: '100%' }}>
-                    <thead>
-                        <tr>
-                            <th scope="col">{t('slo.feature')}</th>
-                            <th scope="col">{t('slo.prometheus')}</th>
-                            <th scope="col">{t('slo.datadog')}</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {caps.data.features.map((f) => (
-                            <tr key={f.feature}>
-                                <td>{f.feature}</td>
-                                <td>{f.prometheus}</td>
-                                <td>{f.datadog}</td>
+                <TableScroll label={t('slo.capsTitle')}>
+                    <table style={{ borderCollapse: 'collapse', width: '100%' }}>
+                        <thead>
+                            <tr>
+                                <th scope="col">{t('slo.feature')}</th>
+                                <th scope="col">{t('slo.prometheus')}</th>
+                                <th scope="col">{t('slo.datadog')}</th>
                             </tr>
-                        ))}
-                    </tbody>
-                </table>
+                        </thead>
+                        <tbody>
+                            {caps.data.features.map((f) => (
+                                <tr key={f.feature}>
+                                    <td>{f.feature}</td>
+                                    <td>{f.prometheus}</td>
+                                    <td>{f.datadog}</td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </TableScroll>
             )}
         </Card>
     );
@@ -552,14 +559,7 @@ export function SloPage() {
     return (
         <section aria-labelledby="slo-title">
             <h1 id="slo-title">{t('nav.slo')}</h1>
-            <div
-                style={{
-                    display: 'grid',
-                    gridTemplateColumns: 'minmax(240px, 320px) 1fr',
-                    gap: 16,
-                    alignItems: 'start',
-                }}
-            >
+            <div className="split-layout">
                 <div style={{ display: 'grid', gap: 16 }}>
                     <SloListPanel selected={selected} onSelect={setSelected} />
                     <DriftPanel />

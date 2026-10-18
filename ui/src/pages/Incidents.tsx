@@ -607,14 +607,7 @@ export function IncidentsPage() {
     return (
         <section aria-labelledby="incidents-title">
             <h1 id="incidents-title">{t('nav.incidents')}</h1>
-            <div
-                style={{
-                    display: 'grid',
-                    gridTemplateColumns: 'minmax(240px, 340px) 1fr',
-                    gap: 16,
-                    alignItems: 'start',
-                }}
-            >
+            <div className="split-layout">
                 <div style={{ display: 'grid', gap: 16 }}>
                     <Card title={t('incident.listTitle')}>
                         <label>

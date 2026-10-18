@@ -55,6 +55,21 @@ body {
     font-variant-numeric: tabular-nums;
 }
 
+/* U8: tata letak dua kolom (daftar + detail) pada /slo dan /incidents.
+   Di layar sempit (< 1000px) kolom MENUMPUK agar tidak ada overflow
+   horizontal (zoom 200% / reflow, WCAG 1.4.4 & 1.4.10). */
+.split-layout {
+    display: grid;
+    gap: 16px;
+    align-items: start;
+    grid-template-columns: minmax(240px, 320px) minmax(0, 1fr);
+}
+@media (max-width: 1000px) {
+    .split-layout {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}
+
 @media (prefers-reduced-motion: reduce) {
     *,
     *::before,

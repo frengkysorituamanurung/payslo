@@ -12,6 +12,7 @@ import {
 import { formatRelative } from '../utils/time';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { ErrorState } from '../components/States';
+import { TableScroll } from '../components/TableScroll';
 
 const PROVIDERS = ['bca', 'mandiri', 'ewallet'] as const;
 
@@ -127,45 +128,47 @@ function RoutingPanel({ ask }: { ask: (target: string, run: () => void) => void 
             }}
         >
             <h2 id="control-routing-title">{t('control.routingTitle')}</h2>
-            <table style={{ borderCollapse: 'collapse', width: '100%' }}>
-                <thead>
-                    <tr>
-                        <th scope="col">{t('payments.provider')}</th>
-                        <th scope="col">{t('control.enabled')}</th>
-                        <th scope="col">{t('control.weight')}</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {PROVIDERS.map((name) => (
-                        <tr key={name}>
-                            <td>{name}</td>
-                            <td>
-                                <input
-                                    type="checkbox"
-                                    checked={cfg[name].enabled}
-                                    aria-label={`${name} ${t('control.enabled')}`}
-                                    onChange={(e) => {
-                                        update(name, { enabled: e.target.checked });
-                                    }}
-                                />
-                            </td>
-                            <td>
-                                <input
-                                    type="number"
-                                    min={0}
-                                    max={100}
-                                    value={cfg[name].weight}
-                                    aria-label={`${name} ${t('control.weight')}`}
-                                    onChange={(e) => {
-                                        update(name, { weight: Number(e.target.value) });
-                                    }}
-                                    style={{ width: 80 }}
-                                />
-                            </td>
+            <TableScroll label={t('control.routingTitle')}>
+                <table style={{ borderCollapse: 'collapse', width: '100%' }}>
+                    <thead>
+                        <tr>
+                            <th scope="col">{t('payments.provider')}</th>
+                            <th scope="col">{t('control.enabled')}</th>
+                            <th scope="col">{t('control.weight')}</th>
                         </tr>
-                    ))}
-                </tbody>
-            </table>
+                    </thead>
+                    <tbody>
+                        {PROVIDERS.map((name) => (
+                            <tr key={name}>
+                                <td>{name}</td>
+                                <td>
+                                    <input
+                                        type="checkbox"
+                                        checked={cfg[name].enabled}
+                                        aria-label={`${name} ${t('control.enabled')}`}
+                                        onChange={(e) => {
+                                            update(name, { enabled: e.target.checked });
+                                        }}
+                                    />
+                                </td>
+                                <td>
+                                    <input
+                                        type="number"
+                                        min={0}
+                                        max={100}
+                                        value={cfg[name].weight}
+                                        aria-label={`${name} ${t('control.weight')}`}
+                                        onChange={(e) => {
+                                            update(name, { weight: Number(e.target.value) });
+                                        }}
+                                        style={{ width: 80 }}
+                                    />
+                                </td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </TableScroll>
             <div style={{ marginTop: 8 }}>
                 <button
                     type="button"
@@ -271,39 +274,41 @@ function AuditPanel() {
                 <p style={{ color: 'var(--text-muted)' }}>{t('control.auditEmpty')}</p>
             )}
             {audit.isSuccess && audit.data.length > 0 && (
-                <table style={{ borderCollapse: 'collapse', width: '100%' }}>
-                    <thead>
-                        <tr>
-                            <th scope="col">{t('control.auditTime')}</th>
-                            <th scope="col">{t('control.auditActor')}</th>
-                            <th scope="col">{t('control.auditAction')}</th>
-                            <th scope="col">{t('control.auditTarget')}</th>
-                            <th scope="col">{t('control.auditResult')}</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {audit.data.map((entry, i) => (
-                            <tr key={`${entry.ts}-${String(i)}`}>
-                                <td>
-                                    <time dateTime={entry.ts} title={entry.ts}>
-                                        {formatRelative(entry.ts, i18n.language)}
-                                    </time>
-                                </td>
-                                <td>{entry.actor}</td>
-                                <td>{entry.action}</td>
-                                <td>{entry.target}</td>
-                                <td>
-                                    {entry.result === 'ok'
-                                        ? t('control.resultOk')
-                                        : t('control.resultError')}
-                                    {entry.error !== undefined &&
-                                        entry.error !== '' &&
-                                        ` — ${entry.error}`}
-                                </td>
+                <TableScroll label={t('control.auditTitle')}>
+                    <table style={{ borderCollapse: 'collapse', width: '100%' }}>
+                        <thead>
+                            <tr>
+                                <th scope="col">{t('control.auditTime')}</th>
+                                <th scope="col">{t('control.auditActor')}</th>
+                                <th scope="col">{t('control.auditAction')}</th>
+                                <th scope="col">{t('control.auditTarget')}</th>
+                                <th scope="col">{t('control.auditResult')}</th>
                             </tr>
-                        ))}
-                    </tbody>
-                </table>
+                        </thead>
+                        <tbody>
+                            {audit.data.map((entry, i) => (
+                                <tr key={`${entry.ts}-${String(i)}`}>
+                                    <td>
+                                        <time dateTime={entry.ts} title={entry.ts}>
+                                            {formatRelative(entry.ts, i18n.language)}
+                                        </time>
+                                    </td>
+                                    <td>{entry.actor}</td>
+                                    <td>{entry.action}</td>
+                                    <td>{entry.target}</td>
+                                    <td>
+                                        {entry.result === 'ok'
+                                            ? t('control.resultOk')
+                                            : t('control.resultError')}
+                                        {entry.error !== undefined &&
+                                            entry.error !== '' &&
+                                            ` — ${entry.error}`}
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </TableScroll>
             )}
         </section>
     );
@@ -325,7 +330,7 @@ export function ControlPage() {
             <div
                 style={{
                     display: 'grid',
-                    gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+                    gridTemplateColumns: 'repeat(auto-fit, minmax(min(280px, 100%), 1fr))',
                     gap: 16,
                 }}
             >

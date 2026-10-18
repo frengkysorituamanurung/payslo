@@ -5,6 +5,7 @@ import { useCopyDiagnostics, useDiagnostics } from '../hooks/useObserve';
 import { applyTheme, type Theme } from '../utils/theme';
 import { ErrorState } from '../components/States';
 import { CopyCommand } from '../components/CopyCommand';
+import { TableScroll } from '../components/TableScroll';
 
 function Card({ title, children }: { title: string; children: React.ReactNode }) {
     return (
@@ -189,26 +190,28 @@ function DiagnosticsPanel() {
                     ⏱ {report.docker.note ?? t('settings.dockerUnavailable')}
                 </p>
             ) : (
-                <table>
-                    <thead>
-                        <tr>
-                            <th scope="col">{t('settings.container')}</th>
-                            <th scope="col">{t('settings.cpu')}</th>
-                            <th scope="col">{t('settings.memory')}</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {(report.docker.stats ?? []).map((s) => (
-                            <tr key={s.name}>
-                                <td>{s.name}</td>
-                                <td>{s.cpuPerc}</td>
-                                <td>
-                                    {s.memUsage} ({s.memPerc})
-                                </td>
+                <TableScroll label={t('settings.resources')}>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th scope="col">{t('settings.container')}</th>
+                                <th scope="col">{t('settings.cpu')}</th>
+                                <th scope="col">{t('settings.memory')}</th>
                             </tr>
-                        ))}
-                    </tbody>
-                </table>
+                        </thead>
+                        <tbody>
+                            {(report.docker.stats ?? []).map((s) => (
+                                <tr key={s.name}>
+                                    <td>{s.name}</td>
+                                    <td>{s.cpuPerc}</td>
+                                    <td>
+                                        {s.memUsage} ({s.memPerc})
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </TableScroll>
             )}
             <h3>{t('settings.reportTitle')}</h3>
             <p style={{ color: 'var(--text-muted)', fontSize: 12 }}>{t('settings.reportHint')}</p>

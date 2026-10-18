@@ -29,6 +29,19 @@ function Card({ title, children }: { title: string; children: React.ReactNode })
 // Render HTML yang SUDAH disanitasi server-side. DOMPurify = lapisan kedua
 // (UI-SPEC: markdown kurikulum boleh dangerouslySetInnerHTML bila disanitasi
 // dan diuji). Tanpa DOMPurify ini, server yang diganti bisa menyuntikkan HTML.
+//
+// Modul kurikulum adalah dokumen markdown mandiri yang judulnya `# …` (h1).
+// Saat disematkan di halaman yang sudah punya h1, judul itu diturunkan satu
+// level (h1->h2, h2->h3, dst.) agar hierarki judul tetap benar dan halaman
+// tetap punya tepat satu h1 (WCAG 1.3.1 / 2.4.6).
+function demoteHeadings(html: string): string {
+    return html.replace(
+        /<(\/?)h([1-5])(\s[^>]*)?>/gi,
+        (_m, close: string, level: string, attrs: string | undefined) =>
+            `<${close}h${String(Number(level) + 1)}${attrs ?? ''}>`,
+    );
+}
+
 function SafeHtml({ html }: { html: string }) {
     const clean = DOMPurify.sanitize(html, {
         ALLOWED_TAGS: [
@@ -49,7 +62,7 @@ function SafeHtml({ html }: { html: string }) {
         ALLOWED_ATTR: ['href'],
         ALLOWED_URI_REGEXP: /^(https?:|mailto:)/i,
     });
-    return <div dangerouslySetInnerHTML={{ __html: clean }} />;
+    return <div dangerouslySetInnerHTML={{ __html: demoteHeadings(clean) }} />;
 }
 
 function ModuleSection({
@@ -186,7 +199,7 @@ export function LearnPage() {
                         <dl
                             style={{
                                 display: 'grid',
-                                gridTemplateColumns: 'max-content 1fr',
+                                gridTemplateColumns: 'max-content minmax(0, 1fr)',
                                 gap: '6px 16px',
                             }}
                         >

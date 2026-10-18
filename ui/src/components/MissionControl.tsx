@@ -111,7 +111,13 @@ export function MissionControl() {
                 />
             )}
             {summary.isSuccess && (
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                <div
+                    style={{
+                        display: 'grid',
+                        gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)',
+                        gap: 16,
+                    }}
+                >
                     <section aria-label={t('mission.httpPanel')}>
                         <h2>{t('mission.httpPanel')}</h2>
                         <MetricPanel
@@ -160,7 +166,13 @@ export function MissionControl() {
             )}
 
             <h2>{t('mission.perProvider')}</h2>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
+            <div
+                style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
+                    gap: 12,
+                }}
+            >
                 {PROVIDERS.map((p) => {
                     const m = summary.data?.metrics[`payment_success_ratio_by_provider:${p}`];
                     return (

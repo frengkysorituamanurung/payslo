@@ -306,6 +306,7 @@ export function AppShell() {
                     <label>
                         {t('topbar.theme')}{' '}
                         <select
+                            data-testid="theme-select"
                             value={theme}
                             onChange={(e) => {
                                 const next = e.target.value === 'dark' ? 'dark' : 'light';
@@ -320,6 +321,7 @@ export function AppShell() {
                     <label>
                         {t('topbar.language')}{' '}
                         <select
+                            data-testid="lang-select"
                             value={i18n.language}
                             onChange={(e) => void i18n.changeLanguage(e.target.value)}
                         >

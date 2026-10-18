@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import uPlot from 'uplot';
 import 'uplot/dist/uPlot.min.css';
 import type { MetricsSeries } from '../hooks/useLab';
+import { TableScroll } from './TableScroll';
 
 function canvas2dAvailable(): boolean {
     try {
@@ -78,17 +79,19 @@ export function TimeSeriesChart({
                 {showTable ? t('mission.showChart') : t('mission.showTable')}
             </button>
             {showTable || noCanvas ? (
-                <table>
-                    <caption>{series.name}</caption>
-                    <tbody>
-                        {series.points.map((p) => (
-                            <tr key={p[0]}>
-                                <td>{p[0]}</td>
-                                <td>{p[1] === null ? '—' : String(p[1])}</td>
-                            </tr>
-                        ))}
-                    </tbody>
-                </table>
+                <TableScroll label={series.name}>
+                    <table>
+                        <caption>{series.name}</caption>
+                        <tbody>
+                            {series.points.map((p) => (
+                                <tr key={p[0]}>
+                                    <td>{p[0]}</td>
+                                    <td>{p[1] === null ? '—' : String(p[1])}</td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </TableScroll>
             ) : (
                 <div ref={ref} role="img" aria-label={series.name} />
             )}

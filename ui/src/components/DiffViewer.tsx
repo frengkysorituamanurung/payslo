@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { diffLines, type Change } from 'diff';
+import { TableScroll } from './TableScroll';
 
 type Row = { kind: 'same'; no: string; text: string } | { kind: 'added' | 'removed'; text: string };
 
@@ -49,48 +50,50 @@ export function DiffViewer({
                 {t('slo.diffSummary', { added, removed })}
                 {note !== undefined && note !== '' ? ` — ${note}` : ''}
             </p>
-            <table
-                style={{
-                    borderCollapse: 'collapse',
-                    width: '100%',
-                    fontFamily: 'monospace',
-                    fontSize: 12,
-                }}
-            >
-                <caption style={{ textAlign: 'start', color: 'var(--text-muted)' }}>
-                    {t('slo.diffCaption')}
-                </caption>
-                <tbody>
-                    {rows.map((row, i) => {
-                        const key = `r${String(i)}`;
-                        if (row.kind === 'same') {
+            <TableScroll label={t('slo.diffCaption')}>
+                <table
+                    style={{
+                        borderCollapse: 'collapse',
+                        width: '100%',
+                        fontFamily: 'monospace',
+                        fontSize: 12,
+                    }}
+                >
+                    <caption style={{ textAlign: 'start', color: 'var(--text-muted)' }}>
+                        {t('slo.diffCaption')}
+                    </caption>
+                    <tbody>
+                        {rows.map((row, i) => {
+                            const key = `r${String(i)}`;
+                            if (row.kind === 'same') {
+                                return (
+                                    <tr key={key}>
+                                        <td style={{ width: 32, color: 'var(--text-muted)' }}>
+                                            {row.no}
+                                        </td>
+                                        <td style={{ width: 24 }} aria-hidden="true">
+                                            {' '}
+                                        </td>
+                                        <td>{row.text}</td>
+                                    </tr>
+                                );
+                            }
+                            const isAdded = row.kind === 'added';
+                            const bg = isAdded ? 'var(--ok-bg)' : 'var(--crit-bg)';
+                            const fg = isAdded ? 'var(--ok)' : 'var(--crit)';
                             return (
-                                <tr key={key}>
-                                    <td style={{ width: 32, color: 'var(--text-muted)' }}>
-                                        {row.no}
-                                    </td>
+                                <tr key={key} style={{ background: bg, color: fg }}>
+                                    <td style={{ width: 32 }}>…</td>
                                     <td style={{ width: 24 }} aria-hidden="true">
-                                        {' '}
+                                        {isAdded ? '+' : '-'}
                                     </td>
                                     <td>{row.text}</td>
                                 </tr>
                             );
-                        }
-                        const isAdded = row.kind === 'added';
-                        const bg = isAdded ? 'var(--ok-bg)' : 'var(--crit-bg)';
-                        const fg = isAdded ? 'var(--ok)' : 'var(--crit)';
-                        return (
-                            <tr key={key} style={{ background: bg, color: fg }}>
-                                <td style={{ width: 32 }}>…</td>
-                                <td style={{ width: 24 }} aria-hidden="true">
-                                    {isAdded ? '+' : '-'}
-                                </td>
-                                <td>{row.text}</td>
-                            </tr>
-                        );
-                    })}
-                </tbody>
-            </table>
+                        })}
+                    </tbody>
+                </table>
+            </TableScroll>
         </div>
     );
 }

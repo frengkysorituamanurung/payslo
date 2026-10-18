@@ -19,6 +19,7 @@ import {
 import { formatLocal, formatRelative } from '../utils/time';
 import { EmptyState, ErrorState } from '../components/States';
 import { Timeline } from '../components/Timeline';
+import { TableScroll } from '../components/TableScroll';
 
 const STATUSES: ReadonlyArray<NonNullable<PaymentSummary['status']>> = [
     'CREATED',
@@ -133,7 +134,7 @@ function PaymentFormPanel() {
             <div
                 style={{
                     display: 'grid',
-                    gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+                    gridTemplateColumns: 'repeat(auto-fit, minmax(min(180px, 100%), 1fr))',
                     gap: 12,
                 }}
             >
@@ -463,60 +464,64 @@ export function PaymentsPage() {
                     <EmptyState next={t('payments.emptyNext')} />
                 )}
                 {items.length > 0 && (
-                    <table style={{ borderCollapse: 'collapse', width: '100%' }}>
-                        <caption style={{ textAlign: 'start', color: 'var(--text-muted)' }}>
-                            {t('payments.tableCaption')}
-                        </caption>
-                        <thead>
-                            <tr>
-                                <th scope="col">{t('payments.colTime')}</th>
-                                <th scope="col">{t('payments.colOrder')}</th>
-                                <th scope="col">{t('payments.colChannel')}</th>
-                                <th scope="col">{t('payments.colProvider')}</th>
-                                <th scope="col">{t('payments.colAmount')}</th>
-                                <th scope="col">{t('payments.colStatus')}</th>
-                                <th scope="col">{t('payments.colCallback')}</th>
-                                <th scope="col">{t('payments.colAction')}</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {items.map((p) => (
-                                <tr key={p.id}>
-                                    <td>
-                                        <time dateTime={p.createdAt} title={p.createdAt}>
-                                            {formatRelative(p.createdAt, i18n.language)}
-                                        </time>
-                                    </td>
-                                    <td>{p.orderId}</td>
-                                    <td>{p.channel}</td>
-                                    <td>{p.provider}</td>
-                                    <td style={{ textAlign: 'end' }}>{formatIDRPlain(p.amount)}</td>
-                                    <td>{p.status}</td>
-                                    <td>
-                                        {p.duplicateCallback ? (
-                                            <span role="note">
-                                                {t('payments.callbackReceived', {
-                                                    count: p.callbackCount,
-                                                })}
-                                            </span>
-                                        ) : (
-                                            String(p.callbackCount)
-                                        )}
-                                    </td>
-                                    <td>
-                                        <button
-                                            type="button"
-                                            onClick={() => {
-                                                setSelected(p.id);
-                                            }}
-                                        >
-                                            {t('payments.viewDetail')}
-                                        </button>
-                                    </td>
+                    <TableScroll label={t('payments.table')}>
+                        <table style={{ borderCollapse: 'collapse', width: '100%' }}>
+                            <caption style={{ textAlign: 'start', color: 'var(--text-muted)' }}>
+                                {t('payments.tableCaption')}
+                            </caption>
+                            <thead>
+                                <tr>
+                                    <th scope="col">{t('payments.colTime')}</th>
+                                    <th scope="col">{t('payments.colOrder')}</th>
+                                    <th scope="col">{t('payments.colChannel')}</th>
+                                    <th scope="col">{t('payments.colProvider')}</th>
+                                    <th scope="col">{t('payments.colAmount')}</th>
+                                    <th scope="col">{t('payments.colStatus')}</th>
+                                    <th scope="col">{t('payments.colCallback')}</th>
+                                    <th scope="col">{t('payments.colAction')}</th>
                                 </tr>
-                            ))}
-                        </tbody>
-                    </table>
+                            </thead>
+                            <tbody>
+                                {items.map((p) => (
+                                    <tr key={p.id}>
+                                        <td>
+                                            <time dateTime={p.createdAt} title={p.createdAt}>
+                                                {formatRelative(p.createdAt, i18n.language)}
+                                            </time>
+                                        </td>
+                                        <td>{p.orderId}</td>
+                                        <td>{p.channel}</td>
+                                        <td>{p.provider}</td>
+                                        <td style={{ textAlign: 'end' }}>
+                                            {formatIDRPlain(p.amount)}
+                                        </td>
+                                        <td>{p.status}</td>
+                                        <td>
+                                            {p.duplicateCallback ? (
+                                                <span role="note">
+                                                    {t('payments.callbackReceived', {
+                                                        count: p.callbackCount,
+                                                    })}
+                                                </span>
+                                            ) : (
+                                                String(p.callbackCount)
+                                            )}
+                                        </td>
+                                        <td>
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    setSelected(p.id);
+                                                }}
+                                            >
+                                                {t('payments.viewDetail')}
+                                            </button>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </TableScroll>
                 )}
 
                 {list.hasNextPage && (

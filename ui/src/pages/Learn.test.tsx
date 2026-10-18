@@ -48,4 +48,17 @@ describe('LearnPage', () => {
             expect(checkbox).toBeChecked();
         });
     });
+
+    // U8 (WCAG 1.3.1 / 2.4.6): HTML modul kurikulum adalah dokumen markdown
+    // mandiri berjudul h1; saat disematkan judulnya harus diturunkan sehingga
+    // halaman tetap punya TEPAT SATU h1.
+    it('menurunkan heading modul (h1 -> h2) agar satu h1 per halaman', async () => {
+        renderLearn();
+        await screen.findByText(/day-01 — Hari 1/);
+        const h1s = screen.getAllByRole('heading', { level: 1 });
+        expect(h1s).toHaveLength(1);
+        expect(h1s[0]).toHaveTextContent('Belajar');
+        const h2s = screen.getAllByRole('heading', { level: 2 });
+        expect(h2s.some((h) => h.textContent === 'Hari 1')).toBe(true);
+    });
 });
