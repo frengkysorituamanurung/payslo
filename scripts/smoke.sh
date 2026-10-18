@@ -4,6 +4,7 @@
 # Dari kondisi bersih:
 #   1. up-lite (build lokal) ATAU up-prebuilt (image GHCR ber-tag versi),
 #   2. tunggu semua service healthy,
+#   2b. verifikasi konsol `lab serve` (health, token disuntikkan, guard mutasi),
 #   3. kirim traffic (e2e-basic: pembayaran -> callback -> webhook via Envoy),
 #   4. apply SLO (payslo -> Prometheus rules + datadog-mock),
 #   5. picu skenario 01 dengan solver otomatis,
@@ -41,6 +42,11 @@ step() {
 }
 fail() { echo "smoke FAIL: $1" >&2; exit 1; }
 need() { command -v "$1" >/dev/null 2>&1 || fail "missing required tool: $1"; }
+
+# Bersihkan server console (lab serve) bila start saat skrip keluar lebih awal.
+SERVE_PID=""
+cleanup_serve() { [ -n "$SERVE_PID" ] && kill "$SERVE_PID" 2>/dev/null || true; }
+trap cleanup_serve EXIT
 
 need docker
 need curl
@@ -96,6 +102,37 @@ print(' '.join(bad))" || true)
   }
   sleep 10
 done
+
+# --- 2b. console `lab serve` (U8): health + guard mutasi ----------------------
+# Memverifikasi konsol UI (embed ui/dist) hidup, menyuntikkan token nonce, dan
+# menegakkan guard mutasi: TANPA token 403, DENGAN token (bukan 403).
+step "2b" "console: lab serve health + guard mutasi"
+if [ ! -f cmd/lab/web/dist/index.html ]; then
+  echo "smoke: UI embed belum dibuild -> make ui-build"
+  make ui-build >/dev/null || fail "make ui-build gagal"
+fi
+(cd cmd/lab && go build -o ../../bin/labserve .) || fail "go build labserve gagal"
+./bin/labserve serve --addr 127.0.0.1:8088 >/tmp/labserve-smoke.log 2>&1 &
+SERVE_PID=$!
+serve_deadline=$(( $(date +%s) + 60 ))
+while ! curl -sf --max-time 2 http://127.0.0.1:8088/ >/dev/null 2>&1; do
+  kill -0 "$SERVE_PID" 2>/dev/null || { cat /tmp/labserve-smoke.log >&2; fail "labserve mati saat start"; }
+  [ "$(date +%s)" -gt "$serve_deadline" ] && { cat /tmp/labserve-smoke.log >&2; fail "labserve timeout up"; }
+  sleep 1
+done
+PAGE="$(curl -sf http://127.0.0.1:8088/)"
+TOKEN="$(printf '%s' "$PAGE" | sed -n 's/.*window.__LAB_TOKEN__="\([^"]*\)".*/\1/p' | head -1)"
+[ -n "$TOKEN" ] || fail "token tidak disuntikkan ke halaman console"
+code_no="$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 -X PUT \
+  -H "Origin: http://127.0.0.1:8088" -H "Content-Type: application/json" \
+  --data '{"ratePerSec":5,"source":"loadgen"}' http://127.0.0.1:8088/api/v1/traffic)"
+code_yes="$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 -X PUT \
+  -H "Origin: http://127.0.0.1:8088" -H "X-Lab-Token: $TOKEN" -H "Content-Type: application/json" \
+  --data '{"ratePerSec":5,"source":"loadgen"}' http://127.0.0.1:8088/api/v1/traffic)"
+kill "$SERVE_PID" 2>/dev/null || true; SERVE_PID=""
+echo "smoke: lab serve tanpa token=$code_no, dengan token=$code_yes"
+[ "$code_no" = "403" ] || fail "mutasi tanpa token harus 403 (dapat $code_no)"
+[ "$code_yes" != "403" ] || fail "mutasi dengan token ditolak 403"
 
 # --- 3. traffic: pembayaran -> callback -> webhook (via Envoy) ----------------
 step 3 "traffic (e2e-basic.sh)"

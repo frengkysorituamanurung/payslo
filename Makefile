@@ -1,4 +1,4 @@
-.PHONY: help fmt lint test build deny up up-lite up-prebuilt down reset status open smoke e2e ui-install ui-dev ui-build ui-test ui-e2e serve serve-demo
+.PHONY: help fmt lint test build deny up up-lite up-prebuilt down reset status open smoke e2e ui-install ui-dev ui-build ui-test ui-e2e ui-audit ui-perf serve serve-demo
 
 help: ## Tampilkan semua target dengan deskripsi
 	@grep -E '^[a-zA-Z0-9_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "%-12s %s\n", $$1, $$2}'
@@ -78,6 +78,12 @@ ui-test: ## Gate kualitas UI: tsc + eslint + vitest + prettier-check
 
 ui-e2e: ## E2E Playwright vs lab serve --demo (butuh browser chromium)
 	bash scripts/ui-e2e.sh
+
+ui-audit: ## Audit UI+Go: npm audit + lisensi + anggaran bundle + gofmt/go vet
+	bash scripts/ui-audit.sh
+
+ui-perf: ## Ukur performa UI: anggaran bundle + FCP/DCL (PERF_SOAK_SECONDS untuk soak)
+	bash scripts/ui-perf.sh
 
 serve: ## lab serve di 127.0.0.1:8088 (butuh ui-build dulu; API live + UI embed)
 	cd cmd/lab && go build -o ../../bin/labserve .

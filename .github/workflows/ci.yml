@@ -104,6 +104,110 @@ jobs:
           # yamllint: disable-line
           echo "$files" | xargs shellcheck -S warning
 
+  go-lab:
+    # U8: CLI lab + server console (Go) — gofmt, vet, test (termasuk uji
+    # keamanan DNS-rebinding dan kontrak openapi.yaml).
+    name: go lab (fmt, vet, test)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4.2.2
+      - uses: actions/setup-go@v5.5.0
+        with:
+          go-version-file: cmd/lab/go.mod
+          cache-dependency-path: cmd/lab/go.sum
+      - name: gofmt
+        run: |
+          set -euo pipefail
+          unformatted=$(gofmt -l cmd/lab)
+          if [ -n "$unformatted" ]; then
+            echo "::error::gofmt perlu dijalankan pada:"; echo "$unformatted"; exit 1
+          fi
+      - run: go vet ./...
+        working-directory: cmd/lab
+      - run: go test ./... -count=1
+        working-directory: cmd/lab
+
+  ui-lint:
+    # U8: UI statis — tsc strict, ESLint (jsx-a11y), Prettier, Vitest.
+    name: ui (tsc, eslint, prettier, vitest)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4.2.2
+      - uses: actions/setup-node@v4.4.0
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: ui/package-lock.json
+      - run: npm ci --no-audit --no-fund
+        working-directory: ui
+      - run: npx tsc --noEmit
+        working-directory: ui
+      - run: npx eslint .
+        working-directory: ui
+      - run: npx prettier --check .
+        working-directory: ui
+      - run: npm test -- --run
+        working-directory: ui
+
+  ui-audit:
+    # U8: audit dependensi/lisensi npm + anggaran bundle + gofmt/go vet.
+    name: ui audit (npm audit, licenses, bundle budget)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4.2.2
+      - uses: actions/setup-node@v4.4.0
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: ui/package-lock.json
+      - uses: actions/setup-go@v5.5.0
+        with:
+          go-version-file: cmd/lab/go.mod
+          cache-dependency-path: cmd/lab/go.sum
+      - run: npm ci --no-audit --no-fund
+        working-directory: ui
+      - run: bash scripts/ui-audit.sh
+
+  ui-e2e:
+    # U8: Playwright end-to-end — a11y (axe matriks 2 tema x 2 bahasa), visual
+    # regression (baseline linux), keamanan (CSP/loopback/mutasi), kompatibilitas
+    # (chromium/firefox/webkit), performa (anggaran bundle + FCP/DCL).
+    name: "ui e2e (playwright: a11y, visual, security, compat, perf)"
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4.2.2
+      - uses: actions/setup-node@v4.4.0
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: ui/package-lock.json
+      - uses: actions/setup-go@v5.5.0
+        with:
+          go-version-file: cmd/lab/go.mod
+          cache-dependency-path: cmd/lab/go.sum
+      - run: npm ci --no-audit --no-fund
+        working-directory: ui
+      - name: Install Playwright browsers (chromium, firefox, webkit)
+        run: npx playwright install --with-deps chromium firefox webkit
+        working-directory: ui
+      - run: make ui-build
+      - name: Build lab serve
+        run: go build -o ../../bin/labserve .
+        working-directory: cmd/lab
+      - name: Playwright (serial)
+        run: npx playwright test --workers=1
+        working-directory: ui
+        env:
+          CI: 'true'
+      - name: Upload Playwright report on failure
+        if: failure()
+        uses: actions/upload-artifact@v4.6.2
+        with:
+          name: playwright-report
+          path: ui/test-results
+          retention-days: 7
+
   gitleaks:
     name: gitleaks
     runs-on: ubuntu-24.04

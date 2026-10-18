@@ -12,7 +12,15 @@ PY=python3
 
 cleanup() {
   # Selalu kembalikan bank + routing seperti semula (best effort).
+  # TTL dikelola eksplisit di langkah 0/11 (rekreasi gateway).
   curl -s -X POST "$BANK/admin/reset" >/dev/null 2>&1 || true
+  curl -s "$ADMIN/admin/routing" 2>/dev/null | $PY -c 'import sys,json
+try:
+  d=json.load(sys.stdin); d["bca"]["enabled"]=True; print(json.dumps(d))
+except Exception: print("")' > /tmp/u4-routing-trap.json 2>/dev/null || true
+  if [ -s /tmp/u4-routing-trap.json ]; then
+    curl -s -X PUT "$ADMIN/admin/routing" -H 'Content-Type: application/json' -d @/tmp/u4-routing-trap.json >/dev/null 2>&1 || true
+  fi
   kill "$SERVE_PID" 2>/dev/null || true
 }
 trap cleanup EXIT
@@ -31,13 +39,16 @@ wait_http() { # $1=url $2=nama
   exit 1
 }
 
-echo "--- 0. prasyarat: stack + loadgen ---"
+echo "--- 0. prasyarat: stack + loadgen + TTL 60 (kanon skenario 01) ---"
 curl -sf --max-time 5 "$ADMIN/admin/routing" >/dev/null || { echo "u4 FAIL: gateway admin mati"; exit 1; }
 curl -sf --max-time 5 "$BANK/admin/profile" >/dev/null || { echo "u4 FAIL: bank-bca mati"; exit 1; }
 if [ -z "$(docker compose --profile traffic ps -q loadgen 2>/dev/null)" ]; then
   echo "u4: loadgen mati, menyalakan profil traffic"
   RATE_PER_SEC=2 docker compose --profile traffic up -d loadgen
 fi
+echo "u4: TTL transaksi -> 60 dtk (seperti scenario start 01)"
+GATEWAY_TXN_TTL_SECS=60 docker compose --profile traffic --profile obs up -d --force-recreate gateway-api >/dev/null
+wait_http "http://127.0.0.1:3000/healthz" "gateway-publik"
 wait_http "$BANK/admin/profile" "bank-bca"
 wait_http "$ADMIN/admin/routing" "gateway-admin"
 
@@ -63,9 +74,9 @@ echo "bersih OK"
 echo "--- 1. chaos: bank-bca down ---"
 curl -sf -X PUT "$BANK/admin/profile" -H 'Content-Type: application/json' -d '{"profile":"down"}' | $PY -c 'import sys,json; print("profile:", json.load(sys.stdin)["profile"])'
 
-echo "--- 2. tunggu insiden open (maks 8 mnt) ---"
+echo "--- 2. tunggu insiden open (maks 6 mnt; TTL 60 + burn 5m/1m) ---"
 INC=""
-for _ in $(seq 1 96); do
+for _ in $(seq 1 72); do
   INC=$(curl -s "$BASE/api/v1/incidents?status=open" | $PY -c 'import sys,json
 xs=[i for i in json.load(sys.stdin)["incidents"] if i["slo"]=="payment-success-rate"]
 print(xs[0]["id"] if xs else "")')
@@ -132,9 +143,9 @@ print("postmortem OK")'
 echo "--- 9. SSE memuat event incident + approval ---"
 curl -sN --max-time 8 "$BASE/api/v1/events" | grep -E "^event: (incident|approval)$" | sort -u | head -4
 
-echo "--- 10. pulih: bank normal -> tunggu resolved (maks 8 mnt) ---"
+echo "--- 10. pulih: bank normal -> tunggu resolved (maks 10 mnt) ---"
 curl -s -X POST "$BANK/admin/reset" >/dev/null
-for _ in $(seq 1 96); do
+for _ in $(seq 1 120); do
   ST=$(curl -s "$BASE/api/v1/incidents/$INC" | $PY -c 'import sys,json; print(json.load(sys.stdin)["incident"]["status"])')
   [ "$ST" = "resolved" ] && break
   sleep 5
@@ -145,9 +156,12 @@ kinds=[e["kind"] for e in json.load(sys.stdin)["timeline"]]
 assert "resolved" in kinds, kinds
 print("timeline resolved OK")'
 
-echo "--- 11. kembalikan routing bca enabled ---"
+echo "--- 11. kembalikan routing bca enabled + TTL 600 ---"
 CUR=$(curl -s "$ADMIN/admin/routing")
 echo "$CUR" | $PY -c 'import sys,json; d=json.load(sys.stdin); d["bca"]["enabled"]=True; print(json.dumps(d))' > /tmp/u4-routing-restore.json
 curl -s -X PUT "$ADMIN/admin/routing" -H 'Content-Type: application/json' -d @/tmp/u4-routing-restore.json | $PY -c 'import sys,json; r=json.load(sys.stdin); assert r["bca"]["enabled"] is True; print("routing restored OK")'
+GATEWAY_TXN_TTL_SECS=600 docker compose --profile traffic --profile obs up -d --force-recreate gateway-api >/dev/null
+wait_http "http://127.0.0.1:3000/healthz" "gateway-publik"
+echo "TTL 600 restored OK"
 
 echo "ACCEPTANCE U4 LIVE OK"
