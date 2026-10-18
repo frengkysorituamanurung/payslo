@@ -49,3 +49,29 @@ Rincian 10 isu awal: `docs/GOOD_FIRST_ISSUES.md`.
 - [x] Halaman: Belajar + Mentor (U6) — render kurikulum tersanitasi, checklist
       per modul, progres SQLite; timeline audit gabunga, inject, snapshot,
       penilaian manual, ekspor laporan.
+
+## U8 (aksesibilitas, performa, keamanan, kompatibilitas, rilis)
+- [x] Audit a11y: axe 0 serious/critical (9 halaman × 2 tema × 2 bahasa),
+      keyboard-only, `aria-live`, `prefers-reduced-motion`, zoom 200% —
+      `ui/e2e/a11y.spec.ts`.
+- [x] Visual regression 9 halaman × 2 tema (deterministik, `--demo`) —
+      `ui/e2e/visual.spec.ts`, baseline darwin + linux di-commit.
+- [x] Performa: anggaran bundle (gate), FCP/DCL lokal, soak SSE 1 jam —
+      `ui/e2e/perf.spec.ts` + `ui/scripts/check-bundle.mjs`.
+- [x] Keamanan: DNS-rebinding (Host asing ditolak), CSP tanpa pelanggaran,
+      hanya loopback, `npm audit` + lisensi, plus `go vet`/gofmt —
+      `ui/e2e/security.spec.ts`, `cmd/lab/security_u8_test.go`.
+- [x] Kompatibilitas Chromium/Firefox/WebKit, 1280/1024/768 px —
+      `ui/e2e/compat.spec.ts`.
+- [x] Rilis: binary console lintas platform (UI tersemat) di `release.yml`.
+- [ ] **Skenario 01 sepenuhnya via UI**: rute `/scenarios` masih placeholder;
+      acceptance "selesaikan skenario 01 lewat UI" BELUM terpenuhi (skenario
+      tetap via CLI `lab`/halaman Insiden). Butuh endpoint Go `scenario/*`
+      (start/stop/hint/answer/verify) + halaman wizard. → isu lanjutan.
+- [ ] **Uji pembaca layar sungguhan** (NVDA/VoiceOver/TalkBack), bukan asersi
+      peran/ARIA Playwright: struktur sudah diuji otomatis, tetapi verifikasi
+      manual dengan pembaca layar nyata belum dilakukan di dev ini.
+- [ ] Snapshot visual & metrik waktu hanya diukur di Chromium; Firefox/WebKit
+      hanya dicek kompatibilitas fungsional + axe.
+- [ ] Lighthouse penuh (butuh Chrome + audit jaringan) — saat ini memakai metrik
+      setara dari Performance API (FCP/DCL/resource count).

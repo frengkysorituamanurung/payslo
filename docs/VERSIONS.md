@@ -75,6 +75,9 @@ Image prebuilt dipublikasikan oleh `.github/workflows/release.yml` setiap push t
 | `docker/build-push-action` | v6.10.0 |
 | `docker/login-action` | v3.3.0 |
 | `gitleaks/gitleaks-action` | v2.3.9 |
+| `actions/setup-node` | v4.4.0 (job UI, U8) |
+| `actions/setup-go` | v5.5.0 (job `cmd/lab`, U8) |
+| `actions/upload-artifact` | v4.6.2 (artefak Playwright/binari, U8) |
 | `cargo-audit` | 0.22.2 (`--locked`) |
 
 ## Cara upgrade (terkontrol)
@@ -93,3 +96,7 @@ Image prebuilt dipublikasikan oleh `.github/workflows/release.yml` setiap push t
    `git tag -s vX.Y.Z && git push origin vX.Y.Z` → workflow `release.yml`
    mempublikasikan ke GHCR → uji `PAYSLO_IMAGE_TAG=vX.Y.Z make up-prebuilt`
    dari clone bersih sebelum mengumumkan.
+5. **Binary konsol (U8)**: tag yang sama juga memicu job `console-binaries` yang
+   mengunggah aset GitHub Release `payslo-lab-console_vX.Y.Z_<os>_<arch>.tar.gz`
+   (`.zip` untuk windows) + `checksums.txt` — tautan unduh untuk trainee tanpa
+   toolchain. Uji: unduh satu, jalankan `./labserve serve --demo`, buka :8088.

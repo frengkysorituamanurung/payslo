@@ -213,3 +213,92 @@ axe-core nol pelanggaran serius/kritis pada setiap halaman (kedua tema), Playwri
 untuk halaman utama (mode --demo, deterministik: waktu dan acak dibekukan), npm audit (atau setara)
 tanpa high/critical, lisensi dependensi diperiksa. Go: gofmt, go vet, golangci-lint, test kontrak
 terhadap openapi.yaml.
+
+# AKSESIBILITAS (U8) — hasil audit
+Diuji otomatis di `ui/e2e/a11y.spec.ts` (Chromium, `lab serve --demo`) dan diverifikasi manual.
+
+- **axe-core**: 0 pelanggaran `serious`/`critical` pada 9 halaman utama × 2 tema (light/dark) ×
+  2 bahasa (id/en) = 36 kombinasi. Tepat satu `<h1>` per halaman; satu `<main>`; satu `<nav>`.
+  (Temuan yang diperbaiki: HTML kurikulum ber-`h1` diturunkan ke `h2` saat disematkan —
+  `SafeHtml`/`demoteHeadings` di `src/pages/Learn.tsx`.)
+- **Keyboard-only**: Tab menjangkau nav → topbar (select tema/bahasa) → konten; semua kontrol utama
+  (checkbox routing, dialog konfirmasi Radix) dapat dioperasikan Tab/Enter/Space; indikator fokus
+  terlihat (`outline`/`box-shadow`); tidak ada elemen tak terlihat yang menerima fokus.
+- **aria-live**: region `aria-live="polite"` mengumumkan insiden/approval baru (diuji: "Approval
+  baru: disable provider bca" muncul di dalam region live). Status memakai ikon **+** teks
+  (`aria-label`), bukan warna saja (U8).
+- **prefers-reduced-motion**: transisi/animasi `body` ≤ 10 ms saat `reduce` diaktifkan.
+- **Zoom 200%** (viewport efektif 640 px): 0 overflow horizontal di semua halaman; tabel memakai
+  `TableScroll` (region fokusabel), grid memakai `minmax(0,1fr)`, kontrol form dibatasi
+  `max-width: 100%` (input `size` bawaan bisa melebihi sel grid pada font Linux).
+- **Isolasi server**: spec a11y memutasi state demo (menonaktifkan provider `bca`, membuat
+  approval). Karena itu project `a11y` memakai **server demo segar sendiri** (`:8090`),
+  terpisah dari spec fungsional `:8088`, agar tidak merusak asumsi spec U2/U4.
+- **Bahasa**: `document.documentElement.lang` mengikuti bahasa aktif (WCAG 3.1.1).
+- **Pembaca layar (manual, TalkBack/VoiceOver/NVDA)**: verifikasi struktur peran+label dilakukan
+  lewat asersi peran/nama + ARIA snapshot Playwright (mis. nav bernama "PaySLO Lab", link bernama,
+  `role=status` punya teks). Catatan: pengujian dengan pembaca layar sungguhan (bukan simulasi)
+  **belum** dilakukan di lingkungan pengembangan ini — dicatat di `docs/BACKLOG.md`.
+
+# VISUAL REGRESSION (U8)
+`ui/e2e/visual.spec.ts`: 9 halaman × 2 tema = 18 snapshot, mode `--demo`, waktu (`Date.now` →
+`demoBase`) dan acak (`Math.random` → mulberry32) dibekukan (`freeze()` di `e2e/lib.ts`), animasi
+dimatikan, `maxDiffPixelRatio: 0.02`. Snapshot per-platform (`*-visual-<platform>.png`); baseline
+`darwin` (dev) dan `linux` (CI) di-commit. Uji memakai **server demo segar** di `:8089` (via
+`webServer`) karena state demo dapat berubah akibat mutasi dari spec lain (pembayaran/routing).
+
+# PERFORMA (U8) — hasil ukur
+Diukur dengan `ui/scripts/check-bundle.mjs` dan `ui/e2e/perf.spec.ts` (Chromium lokal,
+`lab serve --demo`).
+
+- **Bundle initial (gzip)**: JS **225,0 KB** + CSS **3,8 KB** — di bawah anggaran 350 KB.
+  Chunk editor CodeMirror **136,3 KB gzip** termuat **malas** (hanya di `/slo`, diverifikasi
+  tidak dimuat di `/`). `check-bundle.mjs` gagal bila initial melebihi anggaran atau chunk editor
+  bocor ke initial.
+- **Metrik setara Lighthouse** (dari Performance API, bukan Lighthouse penuh):
+  FCP ≈ **56 ms**, DOMContentLoaded ≈ **36 ms**, resource count = **11** (Chromium lokal,
+  contoh pengukuran; ambang: FCP < 2500 ms, DCL < 3500 ms, resources < 80). Uji menunggu
+  entri `first-contentful-paint` muncul sebelum mengukur (paint timing bisa diposting
+  setelah DCL) agar tidak balapan.
+- **Soak SSE 1 jam** (`PERF_SOAK_SECONDS=3600`, Chromium, heap via CDP; 118 sampel @30 dtk
+  setelah warmup 60 dtk): start = **5,7 MB**, end = **6,4 MB**, pertumbuhan = **0,7 MB**
+  (ambang < 20 MB; sampel berosilasi 5–9 MB tanpa tren naik). Membuktikan stream
+  `GET /api/v1/events` terbuka lama tidak membocorkan memori.
+
+# KEAMANAN (U8) — verifikasi ulang
+- **Header**: setiap respons dokumen memuat CSP ketat (`default-src 'self'`;
+  `script-src 'self' 'nonce-…'`; `object-src 'none'`; `base-uri 'none'`; `frame-src`/`connect-src`
+  hanya `http://127.0.0.1:3002`), `X-Content-Type-Options: nosniff`, `Referrer-Policy: no-referrer`;
+  **tanpa** header CORS. Dites di `e2e/security.spec.ts` + Go `TestSecurityHeadersPresent`.
+- **CSP tanpa pelanggaran**: 0 `securitypolicyviolation` (console bersih) di semua halaman.
+  Perbaikan: Zod v4 dimatikan mode JIT (`z.config({ jitless: true })`) agar tidak memprobe
+  `new Function` (memicu pelanggaran `script-src eval`) — lihat `src/zod-setup.ts`.
+- **Hanya loopback**: seluruh alur (termasuk mutasi create payment) hanya mengirim request ke
+  `127.0.0.1` (`e2e/security.spec.ts` memantau setiap request).
+- **DNS rebinding**: Host asing (`evil.example`, `attacker.127.0.0.1.nip.io`, `localhost.`,
+  port salah, Host kosong) ditolak `403` meski koneksi datang dari loopback —
+  `cmd/lab/security_u8_test.go`. Host loopback valid case-insensitive diterima.
+- **Mutasi**: tanpa `Origin` lab / `X-Lab-Token` → `403` (termasuk lewat Host penyerang);
+  dengan keduanya → bukan `403`. Dites di Go + `e2e/security.spec.ts`.
+- **Audit dependensi & lisensi**: `npm audit` (0 high/critical), pemeriksaan lisensi npm
+  (`ui/scripts/check-licenses.mjs`, hanya lisensi permisif — MIT/Apache-2.0/ISC/BSD/MPL-2.0/OFL-1.1
+  dst.), `go vet` + gofmt; dibungkus `make ui-audit` / `scripts/ui-audit.sh`.
+
+# KOMPATIBILITAS (U8)
+`ui/e2e/compat.spec.ts` dijalankan di **Chromium, Firefox, WebKit** (project Playwright): axe bersih
++ tanpa overflow horizontal pada lebar **1280 / 1024 / 768** px, plus alur inti (buat pembayaran)
+di tiap browser.
+
+Batas yang diketahui:
+- Breakpoint penuh dirancang untuk **desktop** (≥ 768 px). Di bawah 768 px tata letak tetap terbaca
+  (tabel `TableScroll`, `/slo` & `/incidents` menumpuk satu kolom via `.split-layout` pada
+  ≤ 1000 px) tetapi **bukan** target mobile-first (UI-SPEC: konsol untuk laptop trainee).
+- Snapshot visual & metrik waktu hanya diukur di Chromium (baseline per-platform).
+- Embed Grafana bergantung pada `GF_SECURITY_ALLOW_EMBEDDING=true`; bila diblokir, fallback
+  "Buka di tab baru" tampil (lihat `docs/troubleshooting.md`).
+- WSL2: akses via `http://127.0.0.1:8088` (bukan IP WSL) — lihat `docs/troubleshooting.md`.
+
+# DEVIASI & CATATAN U8
+- Rute `/scenarios` masih **placeholder**: acceptance "menyelesaikan skenario 01 sepenuhnya via UI"
+  belum terpenuhi; skenario tetap dijalankan lewat CLI `lab` / halaman Insiden (alert → runbook →
+  approval). Dicatat di `docs/BACKLOG.md`.

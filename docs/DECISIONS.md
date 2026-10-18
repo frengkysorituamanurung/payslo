@@ -643,3 +643,88 @@ konteks, opsi, keputusan, alasan. Opsi paling sederhana diutamakan.
   aktual identik kecuali hilangnya item "Mentor".
 - Alasan: golden harus mencerminkan perilaku yang dimaksud; dicatat agar
   tidak dikira regresi U7.
+
+### 2026-10-18 — U8: Zod v4 jitless untuk lolos CSP ketat
+- Konteks: CSP `script-src 'self' 'nonce-…'` TANPA `unsafe-eval`. zod v4
+  menjalankan probe `new Function("")` (JIT) saat skema pertama dibangun di
+  tahap eval modul (`utils/money.ts` membangun `z.object` saat import),
+  memicu `securitypolicyviolation` (`script-src eval`) di SEMUA halaman —
+  didahului `main.tsx` belum berjalan sehingga `z.config()` di badan utama
+  terlambat.
+- Keputusan: `ui/src/zod-setup.ts` memanggil `z.config({ jitless: true })` dan
+  diimpor sebagai **impor pertama** di `main.tsx` (sebelum modul lain membangun
+  skema). Diverifikasi: 0 pelanggaran CSP di seluruh halaman.
+- Alasan: jitless menghilangkan `new Function` sama sekali > memakai
+  `'unsafe-eval'` (melemahkan CSP) atau hash (rapuh terhadap versi zod).
+  Dampak performa validasi form kecil (tidak terukur signifikan).
+
+### 2026-10-18 — U8: `TableScroll` untuk zoom 200% & tabel lebar
+- Konteks: acceptance zoom 200% (viewport efektif 640 px) menuntut 0 overflow
+  horizontal; tabel Pembayaran/SLO/Insiden lebih lebar dari itu.
+- Keputusan: komponen `ui/src/components/TableScroll.tsx` — wrapper
+  `overflow-x:auto` + `tabIndex=0` + `role="region"` + `aria-label` (region
+  fokusabel agar bisa digulir tanpa mouse). Grid besar memakai `minmax(0,1fr)`.
+- Alasan: menggulir di dalam region (bukan body) mencegah overflow halaman,
+  tetap aksesibel keyboard; pola standar WCAG untuk konten tabular lebar.
+
+### 2026-10-18 — U8: breakpoint desktop, `split-layout` menumpuk ≤ 1000 px
+- Konteks: UI-SPEC menargetkan laptop trainee (desktop); compat spec menguji
+  1280/1024/768 px.
+- Keputusan: tidak membuat target mobile-first; halaman `/slo` & `/incidents`
+  memakai `.split-layout` (`grid-template-columns: minmax(240px,320px) minmax(0,1fr)`)
+  yang **menumpuk satu kolom pada ≤ 1000 px** agar tetap terbaca (1024 px masih
+  dua kolom), tetapi < 768 px bukan target resmi (dicatat di UI-SPEC batas
+  diketahui).
+- Alasan: sesuai UI-SPEC; menghindari scope creep mobile.
+
+### 2026-10-18 — U8: visual regression pakai server demo segar + baseline per-platform
+- Konteks: state server demo berubah akibat mutasi spec lain (pembayaran
+  ditambah, routing/audit berubah) sehingga snapshot jadi flaky; font/render
+  berbeda antar-OS (darwin vs linux CI).
+- Keputusan: (a) `playwright.config.ts` menjalankan **server demo kedua yang
+  segar** di `:8089` khusus proyek `visual` (via `webServer`), terpisah dari
+  server fungsional `:8088`; (b) baseline bersufiks platform
+  (`*-visual-<platform>.png`); `darwin` (dev) dan `linux` (CI) sama-sama
+  di-commit. Baseline `linux` dibuat di dalam container
+  `mcr.microsoft.com/playwright:v1.64.1-noble` memakai binary Go statis lintas
+  build (`GOOS=linux`).
+- Alasan: isolasi state = determinisme; baseline per-platform = tidak ada
+  false-positive lintas OS; membuat baseline linux lokal menghindari
+  ketergantungan pada CI saja.
+
+### 2026-10-18 — U8: server demo terpisah untuk audit a11y (mutasi state)
+- Konteks: spec a11y memicu aksi yang **mengubah state** server demo
+  (membuka approval, menjalankan runbook) sehingga snapshot di `:8089`
+  (visual) atau asersi fungsional di `:8088` bisa goyah bila berbagi proses.
+- Keputusan: `playwright.config.ts` menyediakan **server demo ketiga yang segar**
+  di `:8090` khusus proyek `a11y`, dan proyek `chromium` mengecualikan
+  `a11y.spec.ts` (`testIgnore`). Audit axe dijalankan di `:8090` dengan
+  `--project=a11y`; matriks axe (halaman × tema × bahasa) hanya menyentuh
+  server itu.
+- Alasan: isolasi state = determinisme untuk tiga kelas uji (fungsional,
+  visual, a11y); biaya = satu proses server demo tambahan saat e2e, dapat
+  diterima untuk suite lab lokal.
+
+### 2026-10-18 — U8: allowlist lisensi + gate anggaran bundle
+- Konteks: gate `make ui-audit` menolak lisensi di luar daftar permisif dan
+  bundle melebihi anggaran UI-SPEC (350 KB gzip).
+- Keputusan: `ui/scripts/check-licenses.mjs` menambah `OFL-1.1`
+  (`@fontsource/inter`, lisensi font) dan `(MPL-2.0 OR Apache-2.0)`
+  (`dompurify`, dual-license — kita pakai Apache-2.0). `ui/scripts/check-bundle.mjs`
+  gagal bila JS initial > 350 KB gzip ATAU chunk editor (CodeMirror) bocor ke
+  initial (harus lazy di `/slo`).
+- Alasan: menutup "budget awal" UI-SPEC menjadi gate CI nyata; allowlist eksplisit
+  = setiap lisensi non-permisif baru memaksa keputusan sadar.
+
+### 2026-10-18 — U8: rilis console binary lintas platform (UI tersemat)
+- Konteks: `lab serve` (Go) menyematkan UI React; trainee di linux/macOS/Windows
+  (amd64/arm64) butuh binary siap pakai tanpa toolchain.
+- Keputusan: job baru di `.github/workflows/release.yml` mem-build binary Go
+  `labserve` (UI tersemat) untuk 6 target (`linux/darwin/windows` ×
+  `amd64/arm64`), `CGO_ENABLED=0`, nama artefak
+  `payslo-lab-console_<tag>_<os>_<arch>.tar.gz` (`.zip` untuk windows),
+  diunggah ke release + `checksums.txt`.
+- Alasan: memenuhi acceptance "binary multi-platform dengan UI tersemat";
+  Go statis (tanpa cgo) = satu cross-compile sederhana; artefak ber-tag versi
+  (bukan `latest`). Rust `lab` CLI tetap dirilis terpisah (bukan UI).
+- Dampak: job rilis +~3 menit; tidak menambah dependensi runtime.

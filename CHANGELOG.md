@@ -59,6 +59,44 @@ Tanggal dalam UTC.
   (U4: bank down → insiden → diagnostik → approve → routing off → pulih →
   resolved; workspace dikembalikan bersih).
 
+### U8 — aksesibilitas, performa, keamanan, kompatibilitas, rilis
+- **Aksesibilitas**: `ui/e2e/a11y.spec.ts` — axe-core 0 pelanggaran
+  serious/critical pada 9 halaman × 2 tema × 2 bahasa; keyboard-only, urutan
+  fokus, `aria-live` insiden/approval, `prefers-reduced-motion`, zoom 200%
+  tanpa overflow (komponen `TableScroll`). Kurikulum ber-`h1` diturunkan ke
+  `h2` saat disematkan (`SafeHtml`/`demoteHeadings`).
+- **Visual regression**: `ui/e2e/visual.spec.ts` — 18 snapshot (9 halaman ×
+  2 tema), `--demo`, waktu + acak dibekukan, server demo segar `:8089`; baseline
+  darwin + linux di-commit.
+- **Performa**: `ui/scripts/check-bundle.mjs` (JS initial ≤ 350 KB gzip +
+  larangan chunk editor bocor) dan `ui/e2e/perf.spec.ts` (FCP/DCL, code-splitting,
+  soak SSE). Target Make `ui-perf`.
+- **Keamanan**: `cmd/lab/security_u8_test.go` (DNS rebinding — Host asing
+  ditolak 403; mutasi tanpa token/Origin ditolak), `ui/e2e/security.spec.ts`
+  (0 pelanggaran CSP, hanya loopback). Perbaikan CSP: Zod v4 `jitless`
+  (`ui/src/zod-setup.ts`) + `connect-src` menyertakan `http://127.0.0.1:3002`.
+- **Kompatibilitas**: `ui/e2e/compat.spec.ts` di Chromium/Firefox/WebKit pada
+  1280/1024/768 px.
+- **Gate & CI**: `make ui-audit` (`scripts/ui-audit.sh`: npm audit + lisensi +
+  bundle + gofmt/go vet), target `ui-perf`; job CI baru `go-lab`, `ui-lint`,
+  `ui-audit`, `ui-e2e`.
+- **Sistem `lab serve`**: CSP ketat diberlakukan di middleware; smoke
+  (`scripts/smoke.sh`) kini juga memverifikasi `lab serve` (health, mutasi
+  dengan token diterima, tanpa token ditolak).
+- **Rilis**: `release.yml` mem-build binary console lintas platform
+  (linux/macOS/windows × amd64/arm64, `CGO_ENABLED=0`, UI tersemat) +
+  `checksums.txt`.
+- **Dokumentasi**: `ui/README.md`, `ui/CONTRIBUTING.md`, bagian U8 di
+  `docs/UI-SPEC.md`, tangkapan layar di README, entri troubleshooting Lab Console.
+
+### Tests
+- UI: `ui/e2e/{a11y,visual,perf,security,compat}.spec.ts`; unit `Learn.test.tsx`
+  (demote `h1`); Vitest 22 berkas / 86 tes.
+- Go: `cmd/lab/security_u8_test.go` (DNS rebinding/case/CSRF);
+  `TestSecurityHeadersPresent` diperbarui untuk `connect-src`.
+- Skrip: `scripts/{ui-e2e.sh,ui-audit.sh,ui-perf.sh,smoke.sh}` lolos
+  `shellcheck -S warning`.
+
 ## [v0.1.0] - 2026-10-15
 
 Rilis awal lab: seluruh alur trainee + tool PaySLO berjalan lokal via Docker Compose.

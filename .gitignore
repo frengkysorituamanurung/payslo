@@ -57,8 +57,7 @@ ui/dist/
 cmd/lab/web/dist/index.html
 cmd/lab/web/dist/assets/
 cmd/lab/labserve
-bin/labserve
-bin/labserve-linux
+bin/
 ui/playwright-report/
 ui/test-results/
 ui/blob-report/

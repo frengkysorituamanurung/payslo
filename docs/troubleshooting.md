@@ -78,3 +78,35 @@ cek `docker compose config | grep ALLOW_EMBEDDING`) atau header
 X-Frame-Options dari reverse proxy di depan Grafana.
 Solusi: pastikan compose memakai nilai default repo, restart grafana, lalu
 muat ulang. Fallback "Buka di tab baru" selalu tersedia sementara itu.
+
+## Lab Console (U8)
+
+### `lab serve` menampilkan "Placeholder" / UI kosong
+Binary `lab serve` menyematkan (embed) hasil build UI. Bila `ui/dist` belum
+di-build, yang tersemat hanya `web/dist/PLACEHOLDER.html`.
+Solusi: `make ui-install` (sekali), lalu `make ui-build`, lalu jalankan ulang
+`make serve`. Untuk pengembangan cepat, `make ui-dev` (Vite :5173) memproksikan
+API ke `lab serve` sehingga tidak perlu rebuild setiap perubahan.
+
+### Mutasi ditolak `403` di UI
+Setiap mutasi (POST/PUT/DELETE) butuh header `X-Lab-Token` (dari `GET
+/api/v1/session`) **dan** `X-Lab-Actor`, serta `Origin` lab. Bila memanggil API
+langsung (mis. `curl`), sertakan keduanya; halaman UI mengisinya otomatis.
+Bila `403` hanya kadang-kadang, cek apakah DSN/Origin yang dipakai bukan
+`http://127.0.0.1:8088` (Host/Origin asing ditolak — proteksi DNS rebinding).
+
+### `make ui-e2e` gagal: browser Playwright belum ada
+Gejala: error "Executable doesn't exist … chromium".
+Solusi: `cd ui && npx playwright install --with-deps chromium firefox webkit`
+(atau minimal `chromium`; visual/kompatibilitas butuh ketiganya). Di CI, browser
+dipasang otomatis oleh job `ui-e2e`.
+Catatan baseline visual: snapshot bersufiks platform (`*-visual-darwin.png`,
+`*-visual-linux.png`). Bila menjalankan di platform/OS lain, atau UI sengaja
+berubah, perbarui dengan `cd ui && npx playwright test visual.spec.ts --project=visual --update-snapshots`.
+
+### `npm audit` / lisensi gagal (gate `make ui-audit`)
+`make ui-audit` menolak dependensi high/critical dan lisensi di luar allowlist
+permisif. Perbaiki: `cd ui && npm audit fix` (hati-hati: ini mengubah
+`package-lock.json`), atau catat pengecualian baru di
+`ui/scripts/check-licenses.mjs` **beserta alasan**.
+

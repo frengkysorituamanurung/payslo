@@ -20,7 +20,7 @@ make e2e        # cek dasar: 1 pembayaran -> callback -> webhook via Envoy
 make down
 ```
 
-Trainee (setelah stack up):
+Trainee (setelah stack up) — jalur CLI:
 
 ```sh
 cargo run -p lab -- scenario start 01   # atau: ./target/debug/lab scenario start 01
@@ -28,6 +28,19 @@ cargo run -p lab -- scenario start 01   # atau: ./target/debug/lab scenario star
 cargo run -p lab -- verify 01
 cargo run -p lab -- scenario stop 01
 ```
+
+Trainee — jalur **Lab Console** (UI web, tanpa CLI, lihat
+[Lab Console](#lab-console-u0u8)):
+
+```sh
+make up-lite    # atau: PAYSLO_IMAGE_TAG=v0.1.0 make up-prebuilt
+make ui-build   # sekali; UI di-embed ke binary `lab serve`
+make serve      # buka http://127.0.0.1:8088
+```
+
+Kemudian: buat pembayaran di **Pembayaran**, pantau **Insiden** (alert → runbook →
+approval). Menjalankan/memverifikasi skenario kurikulum masih lewat CLI `lab`
+(rute `/scenarios` di UI masih placeholder — lihat `docs/BACKLOG.md`).
 
 Kontributor Rust (jalur build lokal):
 
@@ -169,32 +182,42 @@ make smoke      # pipeline penuh FASE 8 (~75 mnt)
 make e2e        # cek dasar cepat (~30 dtk)
 ```
 
-## Lab Console (U0–U3)
+## Lab Console (U0–U8)
 
 Dashboard web lokal di `127.0.0.1:8088` (Go `lab serve` + React embed):
+
+![Lab Console — Mission Control](docs/images/lab-console.png)
+
+> Tangkapan layar Mission Control (`lab serve --demo`, tema gelap). Snapshot
+> lengkap semua halaman (2 tema) ada di `ui/e2e/visual.spec.ts-snapshots/`.
 
 ```sh
 make ui-install   # npm ci (pin eksak)
 make ui-dev       # Vite :5173 (dengan --dev-proxy untuk API)
 make ui-build     # tsc + vite -> ui/dist (+ salin ke embed Go)
 make ui-test      # tsc + eslint + vitest + prettier-check
-make ui-e2e       # Playwright vs lab serve --demo (axe + cek loopback)
+make ui-e2e       # Playwright vs lab serve --demo (axe + a11y + visual + keamanan)
+make ui-audit     # npm audit + lisensi + anggaran bundle + gofmt/go vet
+make ui-perf      # anggaran bundle + FCP/DCL (PERF_SOAK_SECONDS untuk soak SSE)
 make serve        # API live + UI embed di :8088
 make serve-demo   # fixture deterministik, tanpa Docker
 ```
 
-Halaman aktif: Mission Control (U1), Peta Arsitektur, **Pembayaran** (form uji,
-tabel kursor, timeline, cek status ke bank, tautan Loki) dan **Chaos & Kontrol**
-(traffic/routing/release + audit) pada U2, **SLO Center** pada U3
-(daftar/detail SLO, editor YAML, plan + diff, apply + no-op, drift,
-kapabilitas, kalkulator error budget), serta **Insiden** pada U4 (daftar/
-detail + timeline, alert terkorelasi, runbook diagnostik + ApprovalCard
-tanpa jalan pintas, catatan, postmortem + ekspor Markdown, toast + badge
-realtime). Trainee hanya bicara ke `lab serve`;
-mutasi butuh `X-Lab-Token` + `X-Lab-Actor` dan tercatat di
-`payslo-workspace/lab-audit.jsonl` (append-only). Operasi SLO live butuh
-`DD_API_KEY=lab-only-dd-api-key` di host (`make serve`) untuk koneksi
-datadog-mock.
+Halaman: **Mission Control**, Peta Arsitektur, **Pembayaran**, **Chaos & Kontrol**,
+**SLO Center**, **Insiden**, **Mentor** (PIN), **Belajar** (kurikulum), **Observability**
+(Grafana/Prometheus/Alertmanager/ntfy), **Pengaturan & Diagnostik**. Sisanya placeholder.
+Trainee hanya bicara ke `lab serve`; mutasi butuh `X-Lab-Token` + `X-Lab-Actor` dan
+tercatat di `payslo-workspace/lab-audit.jsonl` (append-only). Operasi SLO live butuh
+`DD_API_KEY=lab-only-dd-api-key` di host (`make serve`) untuk koneksi datadog-mock.
+Fitur aksesibilitas (U8): keyboard-only penuh, `aria-live` untuk insiden/approval,
+dukungan `prefers-reduced-motion`, dan zoom 200% tanpa overflow.
+
+Standar kualitas UI (U8) diverifikasi di CI (`.github/workflows/ci.yml`) dan lokal:
+`tsc --noEmit` strict, ESLint (jsx-a11y + larangan string hardcoded), Prettier, Vitest
+(coverage logika inti ≥ 80%), Playwright (a11y/axe, visual regression, kompatibilitas,
+keamanan), `npm audit` + pemeriksaan lisensi (`ui/scripts/check-licenses.mjs`), serta
+anggaran bundle (`ui/scripts/check-bundle.mjs`: JS initial ≤ 350 KB gzip).
+Angka hasil ukur (bundle, FCP/DCL, soak SSE 1 jam, matriks axe) ada di `docs/UI-SPEC.md`.
 
 Kontrak API: `api/openapi.yaml` (contract-first; tipe TS di-generate ke
 `ui/src/api/`). Spesifikasi UI: `docs/UI-SPEC.md`.
