@@ -111,6 +111,7 @@ func TestSecurityHeadersPresent(t *testing.T) {
 	for _, want := range []string{
 		"default-src 'self'",
 		"script-src 'self' 'nonce-",
+		"connect-src 'self' http://127.0.0.1:3002",
 		"frame-src http://127.0.0.1:3002",
 		"object-src 'none'",
 	} {

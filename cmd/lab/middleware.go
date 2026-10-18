@@ -54,14 +54,16 @@ func mutationGuard(next http.Handler, token, port string) http.Handler {
 }
 
 // nonceCSP: nonce per-request (konteks) + header keamanan. CSP sesuai UI-SPEC:
-// script inline HANYA via nonce (injeksi token); frame hanya Grafana :3002.
+// script inline HANYA via nonce (injeksi token); frame + connect hanya Grafana :3002
+// (UI memuat dashboard lewat iframe dan memprobe reachability via fetch no-cors).
 func nonceCSP(next http.Handler, _ string) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		b := make([]byte, 16)
 		_, _ = rand.Read(b)
 		nonce := hex.EncodeToString(b)
 		csp := "default-src 'self'; script-src 'self' 'nonce-" + nonce + "'; " +
-			"style-src 'self'; img-src 'self' data:; connect-src 'self'; " +
+			"style-src 'self'; img-src 'self' data:; " +
+			"connect-src 'self' http://127.0.0.1:3002; " +
 			"frame-src http://127.0.0.1:3002; object-src 'none'; base-uri 'none'"
 		w.Header().Set("Content-Security-Policy", csp)
 		w.Header().Set("X-Content-Type-Options", "nosniff")

@@ -1,3 +1,6 @@
+// Harus impor PERTAMA: mematikan probe `new Function` Zod sebelum modul lain
+// membangun skema (lihat ui/src/zod-setup.ts).
+import './zod-setup';
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
