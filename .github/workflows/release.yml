@@ -19,6 +19,10 @@
 #
 # Provenance + SBOM attestations aktif (default build-push-action): setiap
 # image membawa attestation yang bisa dicek via `docker buildx imagetools`.
+#
+# Job `console-binaries` (U8) juga mem-build binary `lab serve` (Lab Console,
+# UI React tersemat) untuk 6 platform (linux/darwin/windows x amd64/arm64) dan
+# mengunggahnya sebagai aset GitHub Release + checksums.txt.
 
 name: release
 
@@ -73,3 +77,43 @@ jobs:
           cache-to: type=gha,mode=max
           provenance: true
           sbom: true
+
+  console-binaries:
+    # U8: Lab Console (`lab serve`, Go + UI React tersemat) untuk 6 platform.
+    # CGO_ENABLED=0 -> statis; tanpa toolchain Rust (hanya build UI + Go).
+    name: console binaries (lab serve, UI embedded)
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write # unggah aset ke GitHub Release
+    steps:
+      - uses: actions/checkout@v4.2.2
+      - uses: actions/setup-node@v4.4.0
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: ui/package-lock.json
+      - uses: actions/setup-go@v5.5.0
+        with:
+          go-version-file: cmd/lab/go.mod
+          cache-dependency-path: cmd/lab/go.sum
+      - name: Install UI deps
+        run: npm ci --no-audit --no-fund
+        working-directory: ui
+      - name: Build UI + embed ke Go
+        run: make ui-build
+      - name: Build + package (linux/darwin/windows x amd64/arm64)
+        run: bash scripts/release-console.sh "${{ github.ref_name }}"
+      - name: Checksums
+        run: cd dist/console && sha256sum ./*.tar.gz ./*.zip > checksums.txt && cat checksums.txt
+      - name: Publish assets ke GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1 \
+            || gh release create "$GITHUB_REF_NAME" --generate-notes --title "$GITHUB_REF_NAME"
+          gh release upload "$GITHUB_REF_NAME" dist/console/* --clobber
+      - uses: actions/upload-artifact@v4.6.2
+        with:
+          name: console-binaries
+          path: dist/console
+          retention-days: 7
