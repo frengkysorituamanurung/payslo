@@ -49,9 +49,9 @@ fn row_to_incident(row: &rusqlite::Row<'_>) -> rusqlite::Result<Value> {
         "status": row.get::<_, String>(4)?,
         "severity": row.get::<_, String>(5)?,
         "runbook": row.get::<_, Option<String>>(6)?.unwrap_or_default(),
-        "created_at": row.get::<_, String>(7)?,
-        "updated_at": row.get::<_, String>(8)?,
-        "resolved_at": row.get::<_, Option<String>>(9)?,
+        "createdAt": row.get::<_, String>(7)?,
+        "updatedAt": row.get::<_, String>(8)?,
+        "resolvedAt": row.get::<_, Option<String>>(9)?,
     }))
 }
 
@@ -124,7 +124,7 @@ pub async fn incident_detail(
                 "severity": row.get::<_, String>(4)?,
                 "status": row.get::<_, String>(5)?,
                 "payload": payload,
-                "received_at": row.get::<_, String>(7)?,
+                "receivedAt": row.get::<_, String>(7)?,
             }))
         })
         .map_err(|e| err(StatusCode::SERVICE_UNAVAILABLE, &e.to_string()))?
@@ -191,20 +191,20 @@ pub async fn create_note(
             params![db::now_rfc3339(), actor, id],
         )
         .map_err(|e| err(StatusCode::SERVICE_UNAVAILABLE, &e.to_string()))?;
-    Ok(Json(serde_json::json!({"ok": true, "incident_id": id})))
+    Ok(Json(serde_json::json!({"ok": true, "incidentId": id})))
 }
 
 fn row_to_approval(row: &rusqlite::Row<'_>) -> rusqlite::Result<Value> {
     Ok(serde_json::json!({
         "id": row.get::<_, String>(0)?,
-        "execution_id": row.get::<_, String>(1)?,
-        "step_idx": row.get::<_, i64>(2)?,
-        "incident_id": row.get::<_, String>(3)?,
+        "executionId": row.get::<_, String>(1)?,
+        "stepIdx": row.get::<_, i64>(2)?,
+        "incidentId": row.get::<_, String>(3)?,
         "action": row.get::<_, String>(4)?,
         "status": row.get::<_, String>(5)?,
-        "requested_at": row.get::<_, String>(6)?,
-        "decided_at": row.get::<_, Option<String>>(7)?,
-        "decided_by": row.get::<_, Option<String>>(8)?,
+        "requestedAt": row.get::<_, String>(6)?,
+        "decidedAt": row.get::<_, Option<String>>(7)?,
+        "decidedBy": row.get::<_, Option<String>>(8)?,
         "reason": row.get::<_, Option<String>>(9)?,
     }))
 }
@@ -246,6 +246,7 @@ pub async fn list_approvals(
 }
 
 #[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct CreateApprovalBody {
     pub incident_id: Option<String>,
     pub action: Option<String>,

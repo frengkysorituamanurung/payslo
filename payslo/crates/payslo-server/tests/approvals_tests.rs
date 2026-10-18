@@ -173,7 +173,7 @@ async fn approval_decision_safety() -> Result<(), String> {
     let (status, created) = post(
         &base,
         "/approvals",
-        &serde_json::json!({"incident_id": id, "action": "disable provider bca", "requested_by": "sinta"}),
+        &serde_json::json!({"incidentId": id, "action": "disable provider bca", "requestedBy": "sinta"}),
     )
     .await?;
     assert_eq!(status, 200);
@@ -187,7 +187,7 @@ async fn approval_decision_safety() -> Result<(), String> {
     let (_, again) = post(
         &base,
         "/approvals",
-        &serde_json::json!({"incident_id": id, "action": "disable provider bca"}),
+        &serde_json::json!({"incidentId": id, "action": "disable provider bca"}),
     )
     .await?;
     assert_eq!(again["deduped"], true);
@@ -225,7 +225,7 @@ async fn approval_decision_safety() -> Result<(), String> {
     .await?;
     assert_eq!(status, 200);
     assert_eq!(decided["approval"]["status"], "approved");
-    assert_eq!(decided["approval"]["decided_by"], "sinta");
+    assert_eq!(decided["approval"]["decidedBy"], "sinta");
     // Double decision -> 409 (acceptance: handled safely).
     let (status, body) = post(
         &base,
@@ -253,7 +253,7 @@ async fn reject_with_reason_ok() -> Result<(), String> {
     let (_, created) = post(
         &base,
         "/approvals",
-        &serde_json::json!({"incident_id": id, "action": "restart gateway"}),
+        &serde_json::json!({"incidentId": id, "action": "restart gateway"}),
     )
     .await?;
     let apr = created["approval"]["id"]

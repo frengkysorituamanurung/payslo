@@ -132,6 +132,7 @@ func (s *runbookStore) forSLO(slo string) runbookView {
 		steps = append(steps, stepView{
 			Idx: i, Name: st.Name, Kind: st.Kind, Action: defaultAction(st),
 			Impact: st.Impact, Detail: st.Detail, RequiresApproval: st.Kind == "remediation",
+			Run: st.Run,
 		})
 	}
 	return runbookView{Present: true, File: filepath.Base(path), Steps: steps}
