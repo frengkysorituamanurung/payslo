@@ -58,6 +58,15 @@ cmd/lab/web/dist/index.html
 cmd/lab/web/dist/assets/
 cmd/lab/labserve
 bin/labserve
+bin/labserve-linux
 ui/playwright-report/
 ui/test-results/
+ui/blob-report/
 cmd/lab/lab
+
+# Lab console runtime state (synthetic, regenerable) in nested workspaces
+cmd/lab/payslo-workspace/
+ui/payslo-workspace/
+
+# Release packaging output (scripts/release-console.sh)
+dist/
