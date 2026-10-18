@@ -6,13 +6,18 @@ import { defineConfig, devices } from '@playwright/test';
 // e2e/lib.ts.
 //
 // DUA server demo:
-//   :8088  spec fungsional (a11y, security, compat, perf, halaman).
+//   :8088  spec fungsional (security, compat, perf, halaman U0-U7).
 //   :8089  KHUSUS visual regression — server segar tanpa mutasi dari spec lain
 //          (state demo bisa berubah saat spec lain membuat pembayaran / mengubah
 //          routing, yang akan membuat snapshot tidak deterministik).
+//   :8090  KHUSUS a11y — spec a11y MEMUTASI state (menonaktifkan provider bca,
+//          membuat approval). Bila berbagi server dengan spec U2/U4, mutasi itu
+//          merusak asumsi mereka (bca "sudah nonaktif", approval "sudah dibuat").
+//          Server terpisah -> tiap suite mulai dari state bersih.
 //
 // Project:
-//   chromium  semua spec KECUALI visual (a11y matriks, keamanan, kontrak UI, perf).
+//   chromium  spec fungsional KECUALI visual & a11y.
+//   a11y      a11y.spec.ts vs server segar :8090.
 //   visual    visual.spec.ts vs server segar :8089 (baseline per-platform).
 //   firefox   compat.spec.ts (lintas-browser + axe per halaman).
 //   webkit    compat.spec.ts (WebKit/Safari).
@@ -56,12 +61,29 @@ export default defineConfig({
       reuseExistingServer: process.env['CI'] !== 'true',
       timeout: 60_000,
     },
+    {
+      // Server segar khusus a11y (spec memutasi state: routing, approval).
+      command: './bin/labserve serve --demo --addr 127.0.0.1:8090',
+      cwd: '..',
+      url: 'http://127.0.0.1:8090/',
+      reuseExistingServer: process.env['CI'] !== 'true',
+      timeout: 60_000,
+    },
   ],
   projects: [
     {
       name: 'chromium',
-      testIgnore: ['**/visual.spec.ts'],
+      testIgnore: ['**/visual.spec.ts', '**/a11y.spec.ts'],
       use: { ...devices['Desktop Chrome'], viewport: { width: 1280, height: 720 } },
+    },
+    {
+      name: 'a11y',
+      testMatch: ['**/a11y.spec.ts'],
+      use: {
+        ...devices['Desktop Chrome'],
+        viewport: { width: 1280, height: 720 },
+        baseURL: process.env['PLAYWRIGHT_A11Y_BASE_URL'] ?? 'http://127.0.0.1:8090',
+      },
     },
     {
       name: 'visual',

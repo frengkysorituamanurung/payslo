@@ -70,6 +70,16 @@ body {
     }
 }
 
+/* U8: kontrol form tidak boleh melebihi lebar selnya (cegah overflow horizontal
+   pada zoom 200% / font lebih lebar, mis. Linux). `max-width` (bukan `width`)
+   agar lebar bawaan di layar lebar tidak berubah. Checkbox/radio dikecualikan. */
+input:not([type='checkbox']):not([type='radio']),
+select,
+textarea {
+    min-width: 0;
+    max-width: 100%;
+}
+
 @media (prefers-reduced-motion: reduce) {
     *,
     *::before,
