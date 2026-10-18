@@ -203,17 +203,14 @@ async fn audit_list(
             guard
                 .prepare("SELECT ts, actor, action, details FROM audit_log ORDER BY id LIMIT ?1")
                 .and_then(|mut stmt| {
-                    let rows = stmt.query_map(
-                        [limit],
-                        |row| {
-                            Ok(serde_json::json!({
-                                "ts": row.get::<_, String>(0)?,
-                                "actor": row.get::<_, String>(1)?,
-                                "action": row.get::<_, String>(2)?,
-                                "details": row.get::<_, String>(3)?,
-                            }))
-                        },
-                    )?;
+                    let rows = stmt.query_map([limit], |row| {
+                        Ok(serde_json::json!({
+                            "ts": row.get::<_, String>(0)?,
+                            "actor": row.get::<_, String>(1)?,
+                            "action": row.get::<_, String>(2)?,
+                            "details": row.get::<_, String>(3)?,
+                        }))
+                    })?;
                     rows.collect::<Result<Vec<_>, _>>()
                 })
                 .unwrap_or_default()

@@ -145,10 +145,10 @@ func prevOr2(v *float64) float64 {
 
 func (s *server) handleSnapshotList(w http.ResponseWriter, r *http.Request) {
 	type info struct {
-		Name       string `json:"name"`
-		SavedAt    string `json:"savedAt"`
-		DataTables int    `json:"dataTables"`
-		Overwritten bool  `json:"overwritten"`
+		Name        string `json:"name"`
+		SavedAt     string `json:"savedAt"`
+		DataTables  int    `json:"dataTables"`
+		Overwritten bool   `json:"overwritten"`
 	}
 	if s.cfg.demo {
 		metas := s.demoSnapshotList()
@@ -245,14 +245,14 @@ func (s *server) handleMentorSessions(w http.ResponseWriter, r *http.Request) {
 	type info struct {
 		ScenarioID string  `json:"scenarioId"`
 		StartedAt  string  `json:"startedAt"`
-		EndedAt   *string `json:"endedAt"`
+		EndedAt    *string `json:"endedAt"`
 	}
 	out := make([]info, 0, len(sessions))
 	for _, sess := range sessions {
 		out = append(out, info{
 			ScenarioID: sess.ScenarioID,
 			StartedAt:  unixToRFC3339(sess.StartedAt),
-			EndedAt:   optRFC3339(sess.EndedAt),
+			EndedAt:    optRFC3339(sess.EndedAt),
 		})
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"sessions": out})
@@ -297,17 +297,17 @@ func (s *server) handleMentorSessionSummary(w http.ResponseWriter, r *http.Reque
 		assessment = &mentorAssessment{ScenarioID: scenarioID}
 	}
 	summary := map[string]any{
-		"scenarioId":   sess.ScenarioID,
-		"traineeName":  s.settings.Get().TraineeName,
-		"startedAt":    unixToRFC3339(sess.StartedAt),
-		"endedAt":      optRFC3339(sess.EndedAt),
-		"ttdSecs":      ttd,
-		"actionCount":  len(sess.Actions),
-		"answerCount":  len(sess.Answers),
-		"hintsUsed":    len(sess.HintsUsed),
-		"actions":      sess.Actions,
-		"answers":      sess.Answers,
-		"assessment":   assessment,
+		"scenarioId":  sess.ScenarioID,
+		"traineeName": s.settings.Get().TraineeName,
+		"startedAt":   unixToRFC3339(sess.StartedAt),
+		"endedAt":     optRFC3339(sess.EndedAt),
+		"ttdSecs":     ttd,
+		"actionCount": len(sess.Actions),
+		"answerCount": len(sess.Answers),
+		"hintsUsed":   len(sess.HintsUsed),
+		"actions":     sess.Actions,
+		"answers":     sess.Answers,
+		"assessment":  assessment,
 	}
 	writeJSON(w, http.StatusOK, summary)
 }
@@ -352,7 +352,7 @@ func (s *server) handleMentorAssessmentPut(w http.ResponseWriter, r *http.Reques
 		}
 	}
 	assessment := &mentorAssessment{
-		ScenarioID:          scenarioID,
+		ScenarioID:         scenarioID,
 		CommunicationScore: body.CommunicationScore,
 		CommunicationNote:  strings.TrimSpace(body.CommunicationNote),
 		PostmortemScore:    body.PostmortemScore,

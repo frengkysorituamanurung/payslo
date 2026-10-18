@@ -92,7 +92,7 @@ func (p *progressStore) listProgress() ([]learnProgressItem, error) {
 }
 
 type mentorAssessment struct {
-	ScenarioID          string  `json:"scenarioId"`
+	ScenarioID         string  `json:"scenarioId"`
 	CommunicationScore *int    `json:"communicationScore,omitempty"`
 	CommunicationNote  string  `json:"communicationNote"`
 	PostmortemScore    *int    `json:"postmortemScore,omitempty"`

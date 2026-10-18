@@ -322,7 +322,9 @@ async fn run() -> anyhow::Result<()> {
             Ok(())
         }
         Command::Open {} => {
-            println!("gateway:  http://127.0.0.1:3000/healthz   admin: http://127.0.0.1:3001 (loopback-only)");
+            println!(
+                "gateway:  http://127.0.0.1:3000/healthz   admin: http://127.0.0.1:3001 (loopback-only)"
+            );
             println!("envoy:    http://127.0.0.1:8080   admin: http://127.0.0.1:9901");
             println!("merchant: http://127.0.0.1:5000/state");
             println!("prom:     http://127.0.0.1:9090   alertmanager: http://127.0.0.1:9093");

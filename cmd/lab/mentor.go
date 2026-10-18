@@ -506,10 +506,10 @@ func (s *server) composePSQL(sql string) error {
 
 // labSession cermin crates/lab session.rs (unix seconds -> RFC3339 di API).
 type labSession struct {
-	ScenarioID string      `json:"scenario_id"`
-	StartedAt  int64       `json:"started_at"`
-	EndedAt   *int64      `json:"ended_at"`
-	HintsUsed  []string    `json:"hints_used"`
+	ScenarioID string            `json:"scenario_id"`
+	StartedAt  int64             `json:"started_at"`
+	EndedAt    *int64            `json:"ended_at"`
+	HintsUsed  []string          `json:"hints_used"`
 	Answers    map[string]string `json:"answers"`
 	Actions    []struct {
 		TS     int64  `json:"ts"`

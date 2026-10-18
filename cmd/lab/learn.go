@@ -17,8 +17,8 @@ import (
 // ------------------------------------------------------------------ kurikulum
 
 type checklistItem struct {
-	Key    string `json:"key"`
-	Label  string `json:"label"`
+	Key     string `json:"key"`
+	Label   string `json:"label"`
 	Section string `json:"section"` // aktivitas | latihan
 }
 

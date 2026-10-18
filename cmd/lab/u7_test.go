@@ -24,9 +24,9 @@ func TestObserveStatusDemo(t *testing.T) {
 			Name      string `json:"name"`
 			Reachable bool   `json:"reachable"`
 		} `json:"services"`
-		DockerAvailable   bool            `json:"dockerAvailable"`
-		DockerNote        string          `json:"dockerNote"`
-		ComposeProfiles   map[string]bool `json:"composeProfiles"`
+		DockerAvailable bool            `json:"dockerAvailable"`
+		DockerNote      string          `json:"dockerNote"`
+		ComposeProfiles map[string]bool `json:"composeProfiles"`
 	}
 	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
 		t.Fatalf("bukan JSON: %v", err)

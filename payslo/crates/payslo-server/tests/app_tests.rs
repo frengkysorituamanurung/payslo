@@ -127,7 +127,10 @@ async fn audit_endpoint_lists_entries() -> Result<(), String> {
     let (status, body) = get(&base, "/audit").await?;
     assert_eq!(status, 200, "GET /audit must be public like /incidents");
     let entries = body["entries"].as_array().cloned().unwrap_or_default();
-    assert!(!entries.is_empty(), "audit entries must list after incident open");
+    assert!(
+        !entries.is_empty(),
+        "audit entries must list after incident open"
+    );
     let first = &entries[0];
     for key in ["ts", "actor", "action", "details"] {
         assert!(first.get(key).is_some(), "audit entry missing {key}");

@@ -184,7 +184,9 @@ func TestMentorTraineeForbidden(t *testing.T) {
 	}
 	// Unlock -> token -> /mentor bisa diakses.
 	rec = doMentor(t, h, "POST", "/api/v1/mentor/unlock", `{"pin":"1234"}`, "")
-	var body struct{ Token string `json:"token"` }
+	var body struct {
+		Token string `json:"token"`
+	}
 	_ = json.Unmarshal(rec.Body.Bytes(), &body)
 	rec = doMentor(t, h, "GET", "/mentor", "", body.Token)
 	if rec.Code != http.StatusOK {
@@ -192,7 +194,9 @@ func TestMentorTraineeForbidden(t *testing.T) {
 	}
 	// Session melaporkan mode mentor dengan token.
 	rec = doMentor(t, h, "GET", "/api/v1/session", "", body.Token)
-	var sess struct{ Mode string `json:"mode"` }
+	var sess struct {
+		Mode string `json:"mode"`
+	}
 	_ = json.Unmarshal(rec.Body.Bytes(), &sess)
 	if sess.Mode != "mentor" {
 		t.Fatalf("mode dengan token: got %q, want mentor", sess.Mode)
@@ -249,7 +253,9 @@ func TestMentorTimelineEndpoint(t *testing.T) {
 	h := s.handler()
 	// Unlock dulu (tercatat di audit dengan TS sekarang).
 	rec := doMentor(t, h, "POST", "/api/v1/mentor/unlock", `{"pin":"1234"}`, "")
-	var body struct{ Token string `json:"token"` }
+	var body struct {
+		Token string `json:"token"`
+	}
 	_ = json.Unmarshal(rec.Body.Bytes(), &body)
 	// Audit lab: catat beberapa entri dengan TS deterministik.
 	s.audit.record(auditEntry{TS: "2026-10-16T07:00:00Z", Actor: "trainee", Action: "routing.set", Target: "gateway", Detail: "bca=false"})
@@ -297,7 +303,9 @@ func TestSnapshotSaveChaosLoad(t *testing.T) {
 	h := s.handler()
 	// Unlock.
 	rec := doMentor(t, h, "POST", "/api/v1/mentor/unlock", `{"pin":"1234"}`, "")
-	var body struct{ Token string `json:"token"` }
+	var body struct {
+		Token string `json:"token"`
+	}
 	_ = json.Unmarshal(rec.Body.Bytes(), &body)
 	tok := body.Token
 	// Kondisi awal: traffic 2, routing default.
@@ -364,12 +372,12 @@ func TestSnapshotSaveChaosLoad(t *testing.T) {
 func TestLearnProgressPersistsAcrossRestart(t *testing.T) {
 	dir := t.TempDir()
 	s := newServer(serverConfig{
-		demo:      true,
-		webDir:    "testdata/web",
-		token:     testToken,
-		port:      testPort,
-		mentorPIN: "1234",
-		repoRoot:  filepath.Join("..", ".."),
+		demo:       true,
+		webDir:     "testdata/web",
+		token:      testToken,
+		port:       testPort,
+		mentorPIN:  "1234",
+		repoRoot:   filepath.Join("..", ".."),
 		consoleDir: dir,
 	})
 	h := s.handler()
@@ -380,12 +388,12 @@ func TestLearnProgressPersistsAcrossRestart(t *testing.T) {
 	}
 	// "Restart": server baru, DB sama.
 	s2 := newServer(serverConfig{
-		demo:      true,
-		webDir:    "testdata/web",
-		token:     testToken,
-		port:      testPort,
-		mentorPIN: "1234",
-		repoRoot:  filepath.Join("..", ".."),
+		demo:       true,
+		webDir:     "testdata/web",
+		token:      testToken,
+		port:       testPort,
+		mentorPIN:  "1234",
+		repoRoot:   filepath.Join("..", ".."),
 		consoleDir: dir,
 	})
 	h2 := s2.handler()
@@ -421,8 +429,8 @@ func TestCurriculumRendered(t *testing.T) {
 			Title string `json:"title"`
 			HTML  string `json:"html"`
 			Items []struct {
-				Key    string `json:"key"`
-				Label  string `json:"label"`
+				Key     string `json:"key"`
+				Label   string `json:"label"`
 				Section string `json:"section"`
 			} `json:"items"`
 		} `json:"modules"`
@@ -485,7 +493,9 @@ func TestMentorSessionSummaryAndAssessment(t *testing.T) {
 	}
 	// Unlock.
 	rec := doMentor(t, h, "POST", "/api/v1/mentor/unlock", `{"pin":"1234"}`, "")
-	var body struct{ Token string `json:"token"` }
+	var body struct {
+		Token string `json:"token"`
+	}
 	_ = json.Unmarshal(rec.Body.Bytes(), &body)
 	tok := body.Token
 	// Session summary.
@@ -494,11 +504,11 @@ func TestMentorSessionSummaryAndAssessment(t *testing.T) {
 		t.Fatalf("session-summary: got %d (%s)", rec.Code, rec.Body.String())
 	}
 	var sum struct {
-		ScenarioID   string `json:"scenarioId"`
-		TTDSecs      *int64 `json:"ttdSecs"`
-		ActionCount  int    `json:"actionCount"`
-		AnswerCount  int    `json:"answerCount"`
-		HintsUsed    int    `json:"hintsUsed"`
+		ScenarioID  string `json:"scenarioId"`
+		TTDSecs     *int64 `json:"ttdSecs"`
+		ActionCount int    `json:"actionCount"`
+		AnswerCount int    `json:"answerCount"`
+		HintsUsed   int    `json:"hintsUsed"`
 	}
 	_ = json.Unmarshal(rec.Body.Bytes(), &sum)
 	if sum.ScenarioID != "01" || sum.ActionCount != 2 || sum.AnswerCount != 1 || sum.HintsUsed != 1 {
@@ -555,7 +565,9 @@ func TestMentorInjectTraffic(t *testing.T) {
 	s := mentorTestServer(t, "1234")
 	h := s.handler()
 	rec := doMentor(t, h, "POST", "/api/v1/mentor/unlock", `{"pin":"1234"}`, "")
-	var body struct{ Token string `json:"token"` }
+	var body struct {
+		Token string `json:"token"`
+	}
 	_ = json.Unmarshal(rec.Body.Bytes(), &body)
 	// Inject x3 (dari 2 ke 6).
 	rec = doMentor(t, h, "POST", "/api/v1/mentor/inject/traffic", `{"ratePerSec":6}`, body.Token)

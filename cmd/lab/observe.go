@@ -314,10 +314,10 @@ func (s *server) handleAnnotations(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var raw []struct {
-		ID    int64    `json:"id"`
-		Time  int64    `json:"time"`
-		Text  string   `json:"text"`
-		Tags  []string `json:"tags"`
+		ID   int64    `json:"id"`
+		Time int64    `json:"time"`
+		Text string   `json:"text"`
+		Tags []string `json:"tags"`
 	}
 	if err := json.Unmarshal(body, &raw); err != nil {
 		writeProblem(w, http.StatusBadGateway, "Grafana tak terbaca", "respons anotasi bukan JSON")
