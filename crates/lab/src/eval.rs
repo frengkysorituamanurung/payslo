@@ -280,7 +280,9 @@ pub async fn evaluate(
             }
         }
         Check::RoutingState { provider, enabled } => {
-            match routing_enabled(http, &endpoints.gateway, provider).await {
+            // U0: /admin/* hanya pada listener loopback admin (:3001), bukan
+            // listener publik gateway (:3000) yang di-proxy Envoy.
+            match routing_enabled(http, &endpoints.gateway_admin, provider).await {
                 Ok(actual) => (actual == *enabled, format!("enabled={actual}")),
                 Err(e) => (false, format!("gateway error: {e:#}")),
             }
@@ -396,6 +398,59 @@ mod tests {
         assert!(parse_ts("2026-10-14T12:00:00Z").is_some());
         assert_eq!(parse_ts("1970-01-01T00:00:00Z"), Some(0));
         assert!(parse_ts("bogus").is_none());
+    }
+
+    /// Uji regresi: `Check::RoutingState` harus membaca listener admin
+    /// (`gateway_admin`, :3001), bukan listener publik gateway (:3000).
+    /// Server publik sengaja mengembalikan `enabled=true`; admin `enabled=false`.
+    /// Bila kode keliru memakai `endpoints.gateway`, hasilnya `true` -> test gagal.
+    #[tokio::test]
+    async fn routing_state_reads_admin_listener() -> Result<(), String> {
+        let public = spawn_json_server(r#"{"bca":{"enabled":true}}"#)?;
+        let admin = spawn_json_server(r#"{"bca":{"enabled":false}}"#)?;
+
+        let mut ep = Endpoints::from_env(std::path::PathBuf::from("."));
+        ep.gateway = public;
+        ep.gateway_admin = admin;
+
+        let http = reqwest::Client::builder()
+            .timeout(std::time::Duration::from_secs(5))
+            .build()
+            .map_err(|e| e.to_string())?;
+        let session = crate::session::Session::new("01", 0);
+        let check = crate::model::ScoredCheck {
+            check: crate::model::Check::RoutingState {
+                provider: "bca".to_owned(),
+                enabled: false,
+            },
+            points: 10,
+            soft: false,
+        };
+        let result = evaluate(&http, &ep, std::path::Path::new("."), &session, 0, &check).await;
+        assert!(result.passed, "detail: {}", result.detail);
+        assert_eq!(result.points, 10, "detail: {}", result.detail);
+        Ok(())
+    }
+
+    /// Server HTTP satu-tembak yang mengembalikan `body` sebagai JSON.
+    fn spawn_json_server(body: &'static str) -> Result<String, String> {
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").map_err(|e| e.to_string())?;
+        let addr = listener.local_addr().map_err(|e| e.to_string())?;
+        std::thread::spawn(move || {
+            if let Ok((mut stream, _)) = listener.accept() {
+                use std::io::{Read as _, Write as _};
+                let mut buf = [0u8; 1024];
+                let _ = stream.read(&mut buf);
+                let resp = format!(
+                    "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
+                    body.len(),
+                    body
+                );
+                let _ = stream.write_all(resp.as_bytes());
+                let _ = stream.flush();
+            }
+        });
+        Ok(format!("http://{addr}"))
     }
 
     #[test]

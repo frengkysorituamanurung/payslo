@@ -59,6 +59,14 @@ Tanggal dalam UTC.
   (U4: bank down → insiden → diagnostik → approve → routing off → pulih →
   resolved; workspace dikembalikan bersih).
 
+### Fixed
+- CLI `lab verify`: `Check::RoutingState` kini membaca listener **admin** gateway
+  (`LAB_GATEWAY_ADMIN_URL`, `:3001`); sebelumnya keliru memakai listener publik
+  (`:3000`) yang tidak melayani `/admin/*`, sehingga `verify 01` selalu gagal pada
+  check `routing bca` (error dekode respons kosong). Ditemukan saat menjalankan
+  lab secara lokal; `lab routing disable` sendiri sudah benar. Uji regresi:
+  `eval::tests::routing_state_reads_admin_listener`.
+
 ### U8 — aksesibilitas, performa, keamanan, kompatibilitas, rilis
 - **Aksesibilitas**: `ui/e2e/a11y.spec.ts` — axe-core 0 pelanggaran
   serious/critical pada 9 halaman × 2 tema × 2 bahasa; keyboard-only, urutan

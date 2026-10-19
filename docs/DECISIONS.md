@@ -728,3 +728,21 @@ konteks, opsi, keputusan, alasan. Opsi paling sederhana diutamakan.
   Go statis (tanpa cgo) = satu cross-compile sederhana; artefak ber-tag versi
   (bukan `latest`). Rust `lab` CLI tetap dirilis terpisah (bukan UI).
 - Dampak: job rilis +~3 menit; tidak menambah dependensi runtime.
+
+### 2026-10-19 — Fix: `lab verify` baca routing dari listener admin (:3001)
+- Konteks: menjalankan lab lokal (scenario 01) mengungkap `verify 01` selalu
+  `FAIL` pada check `routing bca` dengan `gateway error: EOF while parsing…`.
+  Sejak U0 endpoint `/admin/*` gateway dipindah ke listener loopback terpisah
+  `:3001` (`LAB_GATEWAY_ADMIN_URL`), dan Envoy hanya mem-proxy `:3000`. Namun
+  `crates/lab/src/eval.rs` (`Check::RoutingState`) masih memakai
+  `endpoints.gateway` (`:3000`) → `404` dengan body kosong → dekode gagal.
+  `lab routing disable` (main.rs) sudah memakai `gateway_admin`, jadi mitigasi
+  bekerja tetapi penilaiannya selalu gagal.
+- Keputusan: ubah `evaluate` agar `routing_enabled` dipanggil dengan
+  `endpoints.gateway_admin` (konsisten dengan seluruh pemakaian lain), plus uji
+  regresi `eval::tests::routing_state_reads_admin_listener` (dua server lokal:
+  publik `enabled=true`, admin `enabled=false`; check harus lolos).
+- Alasan: check harus mengukur state yang sama dengan yang diubah trainee lewat
+  endpoint admin; regresi ini tidak tertangkap test sebelumnya karena
+  `verify`/`smoke` end-to-end belum dijalankan di CI saat U0–U8.
+- Verifikasi: `cargo test -p lab` hijau; `verify 01` live → `RESULT: PASS`.
