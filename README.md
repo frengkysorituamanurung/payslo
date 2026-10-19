@@ -10,6 +10,9 @@ sekaligus lingkungan uji tool open source **PaySLO** (SLO-as-code multi-provider
 > tidak ada cloud, tidak ada Datadog asli (`datadog-mock` hanya tiruan perilaku).
 > Jangan jalankan di server publik, jangan isi data asli, jangan expose port.
 
+> 📖 **Panduan langkah demi langkah dari nol** (prasyarat → stack → Lab Console →
+> skenario → smoke → stop): [`docs/RUNNING.md`](docs/RUNNING.md).
+
 ## Quickstart 5 menit (jalur prebuilt — tanpa kompilasi)
 
 Tiga perintah (butuh Docker Compose v2 + `make`):

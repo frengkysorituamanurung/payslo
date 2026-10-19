@@ -88,6 +88,9 @@ Tanggal dalam UTC.
   `checksums.txt`.
 - **Dokumentasi**: `ui/README.md`, `ui/CONTRIBUTING.md`, bagian U8 di
   `docs/UI-SPEC.md`, tangkapan layar di README, entri troubleshooting Lab Console.
+- **Panduan menjalankan**: `docs/RUNNING.md` — langkah demi langkah dari clone
+  bersih (prasyarat, `make up-prebuilt`/`up-lite`, Lab Console demo/live/dev,
+  skenario, smoke, gate kualitas, stop/reset, port, troubleshooting).
 
 ### Tests
 - UI: `ui/e2e/{a11y,visual,perf,security,compat}.spec.ts`; unit `Learn.test.tsx`
