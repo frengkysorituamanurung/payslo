@@ -40,6 +40,17 @@ Tanggal dalam UTC.
 - `api/openapi.yaml` v0.5.0 (skema pembayaran/kontrol/audit + SLO + insiden)
   + tipe TS di-generate (`openapi-typescript`).
 
+### Changed
+- Lab Console: redesain visual "signal room / ledger instrument" —
+  tipografi IBM Plex Sans/Mono self-hosted, palet hijau-abu/petrol (terang)
+  dan near-black/mint (gelap), sidebar berkelompok, serta Mission Control
+  dengan readout HTTP edge vs ledger pembayaran + strip gap. Status tetap
+  ikon + teks; kontras token diuji. `@fontsource/inter` diganti
+  `@fontsource/ibm-plex-sans` dan `@fontsource/ibm-plex-mono` (5.3.0).
+- Visual regression `/observe` memaksa jalur fallback iframe agar snapshot
+  tidak bergantung pada waktu load Grafana; baseline darwin dan linux
+  diperbarui.
+
 ### Tests
 - Go: kontrak rute vs `openapi.yaml`, uji live `lab_ro` read-only
   (INSERT/UPDATE/DELETE ditolak), keamanan path editor (traversal, absolut,

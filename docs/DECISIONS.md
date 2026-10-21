@@ -746,3 +746,38 @@ konteks, opsi, keputusan, alasan. Opsi paling sederhana diutamakan.
   endpoint admin; regresi ini tidak tertangkap test sebelumnya karena
   `verify`/`smoke` end-to-end belum dijalankan di CI saat U0–U8.
 - Verifikasi: `cargo test -p lab` hijau; `verify 01` live → `RESULT: PASS`.
+
+### 2026-10-22 — UI: arah visual "signal room / ledger instrument"
+- Konteks: UI console sebelumnya memakai pola dashboard admin generik (kartu
+  SaaS seragam, aksen ungu, Inter). Untuk lab SRE/payment, tampilan harus
+  terasa seperti instrumen operasi: padat, tenang, dan jelas membedakan
+  sinyal HTTP dari ledger pembayaran.
+- Opsi: A) pertahankan dashboard kartu generik dan hanya ganti warna;
+  B) arah "signal room / ledger instrument" dengan readout berpasangan
+  (edge Envoy vs ledger DB), tipografi Plex, dan palet hijau-abu/petrol.
+- Keputusan: B.
+  - Tipografi: **IBM Plex Sans** (UI) + **IBM Plex Mono** (ID, timestamp,
+    sumbu chart). Paket self-hosted `@fontsource/ibm-plex-sans@5.3.0` dan
+    `@fontsource/ibm-plex-mono@5.3.0` (pin eksak, subset latin
+    `latin-400/500/600` dan `latin-400/500`); `@fontsource/inter` dihapus.
+    Lisensi font OFL-1.1 (sudah ada di allowlist `check-licenses.mjs`).
+  - Palet: surface hijau-abu dingin + aksen petrol di tema terang; near-black
+    hijau + aksen mint di tema gelap. Status selalu ikon + teks (tidak
+    mengandalkan warna).
+  - Layout: sidebar berkelompok (`Operasi`, `Keandalan`, `Latihan`,
+    `Sistem`), topbar lengket, disclosure navigasi mobile. Mission Control
+    memakai dua panel readout (HTTP edge vs ledger) + strip gap, bukan grid
+    kartu statistik.
+  - Motion: transisi warna pada tombol/nav dihapus (perubahan warna instan).
+    Ini juga mencegah axe membaca warna antara saat ganti tema (kontras
+    transien) dan mengurangi gerak yang tidak menyampaikan informasi.
+- Alasan: bahasa visual mengikuti domain (settlement + reliability), bukan
+  templat admin; Plex terbaca di angka/tabel dan tersedia offline; token
+  kontras yang sudah diuji tetap dipertahankan.
+- Dampak build: 5 berkas WOFF2 latin ≈ 208 KB di `ui/dist` (aset statis,
+  bukan JS); tidak menambah dependensi runtime/server.
+- Verifikasi: `make ui-test` (prettier, tsc, eslint, vitest), `make ui-e2e`
+  (chromium/firefox/webkit, a11y, keamanan, visual) hijau; baseline visual
+  darwin dan linux diperbarui (linux lewat image
+  `mcr.microsoft.com/playwright:v1.64.1-noble`). Snapshot `/observe`
+  memaksa jalur fallback agar tidak bergantung pada waktu load iframe Grafana.
