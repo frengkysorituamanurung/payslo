@@ -1,65 +1,72 @@
 # PaySLO Lab
 
-Lab simulasi payment gateway 100% lokal (Docker Compose) untuk onboarding SRE,
-sekaligus lingkungan uji tool open source **PaySLO** (SLO-as-code multi-provider
-+ incident management + runbook automation).
+PaySLO Lab is a fully local simulation of a payment gateway. It exists to onboard site reliability
+engineers and to provide a realistic test bed for **PaySLO**, an open-source SLO-as-code tool with
+multi-provider support, incident management, and runbook automation.
 
-> ⚠️ **BUKAN UNTUK PRODUKSI.** Lab ini hanya untuk laptop lokal.
-> Semua port di-bind ke `127.0.0.1`, semua kredensial bertanda `lab-only`,
-> semua data sintetis. Tidak ada auth kelas produksi, tidak ada Kubernetes,
-> tidak ada cloud, tidak ada Datadog asli (`datadog-mock` hanya tiruan perilaku).
-> Jangan jalankan di server publik, jangan isi data asli, jangan expose port.
+The entire stack runs on a laptop with Docker Compose. No cloud account, Kubernetes cluster, or real
+Datadog tenant is required. All data is synthetic.
 
-> 📖 **Panduan langkah demi langkah dari nol** (prasyarat → stack → Lab Console →
-> skenario → smoke → stop): [`docs/RUNNING.md`](docs/RUNNING.md).
+> **Not for production.** Every port is bound to `127.0.0.1`, every credential is marked `lab-only`,
+> and all data is generated. There is no production-grade authentication, no Kubernetes, no cloud,
+> and no real Datadog instance (`datadog-mock` reproduces a subset of the API). Do not run this lab on
+> a public server, do not enter real data, and do not expose its ports.
 
-## Quickstart 5 menit (jalur prebuilt — tanpa kompilasi)
+Step-by-step instructions, from prerequisites to a completed scenario, are in
+[docs/RUNNING.md](docs/RUNNING.md).
 
-Tiga perintah (butuh Docker Compose v2 + `make`):
+## Quick start
+
+The three commands below require Docker Compose v2 and `make`. They use prebuilt images and do not
+compile anything:
 
 ```sh
 PAYSLO_IMAGE_TAG=v0.1.0 make up-prebuilt
-make e2e        # cek dasar: 1 pembayaran -> callback -> webhook via Envoy
+make e2e        # one payment -> bank callback -> merchant webhook through Envoy
 make down
 ```
 
-Trainee (setelah stack up) — jalur CLI:
+### Trainee workflow (command line)
+
+Once the stack is running:
 
 ```sh
-cargo run -p lab -- scenario start 01   # atau: ./target/debug/lab scenario start 01
-# ... deteksi via alert, mitigasi via: lab routing disable bca ...
+cargo run -p lab -- scenario start 01   # or: ./target/debug/lab scenario start 01
+# detect the incident through alerts, mitigate, for example: lab routing disable bca
 cargo run -p lab -- verify 01
 cargo run -p lab -- scenario stop 01
 ```
 
-Trainee — jalur **Lab Console** (UI web, tanpa CLI, lihat
-[Lab Console](#lab-console-u0u8)):
+### Trainee workflow (Lab Console)
+
+The Lab Console is a local web interface intended for trainees who prefer not to work from the command
+line:
 
 ```sh
-make up-lite    # atau: PAYSLO_IMAGE_TAG=v0.1.0 make up-prebuilt
-make ui-build   # sekali; UI di-embed ke binary `lab serve`
-make serve      # buka http://127.0.0.1:8088
+make up-lite    # or: PAYSLO_IMAGE_TAG=v0.1.0 make up-prebuilt
+make ui-build   # once; embeds the UI into the `lab serve` binary
+make serve      # open http://127.0.0.1:8088
 ```
 
-Kemudian: buat pembayaran di **Pembayaran**, pantau **Insiden** (alert → runbook →
-approval). Menjalankan/memverifikasi skenario kurikulum masih lewat CLI `lab`
-(rute `/scenarios` di UI masih placeholder — lihat `docs/BACKLOG.md`).
+Create a payment under **Payments** and follow **Incidents** (alert, runbook, approval). Curriculum
+scenarios are still started and verified through the `lab` CLI; the `/scenarios` route in the UI is a
+placeholder (see [docs/BACKLOG.md](docs/BACKLOG.md)).
 
-Kontributor Rust (jalur build lokal):
+### Local build (contributors)
 
 ```sh
-make up-lite    # build lokal + up default+traffic+obs+payslo
-make smoke      # pipeline penuh (up -> traffic -> apply SLO ->
-                # solver 01 -> incident + ntfy + resolved -> down;
-                # ~12-75 mnt tergantung drain burn 1h)
+make up-lite    # build locally and start default+traffic+obs+payslo
+make smoke      # full pipeline: up -> traffic -> apply SLO ->
+                # scenario 01 solver -> incident + ntfy + resolved -> down
+                # approximately 12 to 75 minutes, depending on burn-rate drain
 make down
 ```
 
-> Catatan: image prebuilt terbit per tag git (`v*`) via workflow `release.yml`
-> ke GHCR. Fork WAJIB menimpa registry: `PAYSLO_REGISTRY=ghcr.io/<org> make
-> up-prebuilt` (lihat `docs/VERSIONS.md`). Tag default `v0.1.0`.
+Prebuilt images are published to GHCR for every `v*` git tag by the `release.yml` workflow. Forks must
+override the registry with `PAYSLO_REGISTRY=ghcr.io/<org> make up-prebuilt` (see
+[docs/VERSIONS.md](docs/VERSIONS.md)). The default tag is `v0.1.0`.
 
-## Arsitektur
+## Architecture
 
 ```mermaid
 flowchart LR
@@ -85,145 +92,74 @@ flowchart LR
     graf -. query .-> tempo
 ```
 
-Alur uang (P2): HTTP 200 dari gateway TIDAK berarti pembayaran sukses —
-status final (SUCCESS/FAILED/EXPIRED) datang via callback bank.
+The money flow follows principle P2 from `AGENTS.MD`: an HTTP 200 from the gateway does not mean the
+payment succeeded. The final status (`SUCCESS`, `FAILED`, or `EXPIRED`) arrives through the bank
+callback.
 
-## Daftar URL (semua `127.0.0.1`, lihat `make open`)
+## Services and endpoints
 
-| Layanan | URL | Kredensial |
+All endpoints are bound to `127.0.0.1`. Run `make open` to print the current list.
+
+| Service | URL | Credentials |
 |---|---|---|
-| gateway-api | :3000/healthz, :3000/readyz | — |
-| gateway admin | :3001 (loopback-only, tidak lewat Envoy) | — |
-| Envoy | :8080 (trafik), :9901 (admin/stats) | — |
-| merchant-sink | :5000/state | — |
-| bank-sim | :4001 (bca), :4002 (mandiri), :4003 (ewallet) | — |
-| Prometheus | :9090 | — |
-| Alertmanager | :9093 | — |
-| Grafana | :3002 | admin / `lab-only-grafana` (anonim=Viewer) |
-| sql_exporter | :9399/metrics | via role DB `lab_ro` (read-only) |
-| Loki | :3100 | — |
-| Tempo | :3200 | — |
-| PaySLO | :8081/incidents | — |
-| datadog-mock | :8126 | header `DD-API-KEY` (nilai lab) |
-| ntfy (topik) | :8022/payslo-lab | tanpa auth (lab-only, loopback saja!) |
+| gateway-api | `:3000/healthz`, `:3000/readyz` | None |
+| gateway admin | `:3001` (loopback only, not through Envoy) | None |
+| Envoy | `:8080` (traffic), `:9901` (admin and stats) | None |
+| merchant-sink | `:5000/state` | None |
+| bank-sim | `:4001` (bca), `:4002` (mandiri), `:4003` (ewallet) | None |
+| Prometheus | `:9090` | None |
+| Alertmanager | `:9093` | None |
+| Grafana | `:3002` | `admin` / `lab-only-grafana` (anonymous access is Viewer) |
+| sql_exporter | `:9399/metrics` | Database role `lab_ro` (read-only) |
+| Loki | `:3100` | None |
+| Tempo | `:3200` | None |
+| PaySLO | `:8081/incidents` | None |
+| datadog-mock | `:8126` | `DD-API-KEY` header (lab value) |
+| ntfy topic | `:8022/payslo-lab` | No authentication (lab-only, loopback only) |
 
-## Kebutuhan resource
+## Lab Console
 
-- Laptop 4 CPU / 8 GB RAM; Linux/macOS/Windows-WSL2; amd64 dan arm64.
-- Profil `up-lite` (diukur 2026-10-15, `docker stats --no-stream`, arm64):
+The Lab Console is a local web dashboard at `127.0.0.1:8088`, served by the Go binary `lab serve` with
+an embedded React build.
 
-| Service | RAM pakai / limit |
-|---|---|
-| postgres | ~56 MB / 256 MB |
-| prometheus | ~58 MB / 256 MB |
-| grafana | ~73 MB / 256 MB |
-| envoy | ~17 MB / 128 MB |
-| sql-exporter | ~17 MB / 64 MB |
-| alertmanager | ~27 MB / 64 MB |
-| ntfy | ~14 MB / 64 MB |
-| loadgen (k6) | ~11 MB / 128 MB |
-| gateway-api | ~2 MB / 128 MB |
-| bank-sim ×3 | ~1 MB / 64 MB tiap |
-| merchant-sink | ~2.5 MB / 64 MB |
-| payslo | ~1 MB / 128 MB |
-| datadog-mock | ~1 MB / 64 MB |
-| **Total up-lite** | **~280 MB** (jauh di bawah batas 5 GB, P6) |
-| + obs-full (loki ~45 MB, tempo ≤384 MB, alloy) | ~+200 MB bila diaktifkan |
+![Lab Console: Mission Control](docs/images/lab-console.png)
 
-- Ukuran image Rust (musl statis, `scratch`, diukur 2026-10-15 arm64):
-  gateway-api 14.5 MB, bank-sim 11.3 MB, merchant-sink 5.2 MB,
-  payslo 19.3 MB, datadog-mock 5.4 MB. ntfy (upstream) 118 MB.
-
-## Waktu build + panduan memori 8 GB
-
-Diukur 2026-10-14 (colima 4CPU/8GB arm64); Dockerfile tidak berubah di FASE 8.
-
-| Skenario | Waktu |
-|---|---|
-| Build bersih (cold cache, semua deps musl release) | ± 7 mnt |
-| Incremental (1 file Rust berubah, cache chef) | ± 50 dtk |
-| Tanpa perubahan (full cache) | ± 1 dtk |
-
-- `Dockerfile` memakai `cargo-chef` (planner → cacher → builder) + SATU stage
-  builder (`cargo build --release --workspace`), lalu stage runtime per binary.
-- `CARGO_BUILD_JOBS=2` di-set di `Dockerfile` (env) agar tidak OOM di 8 GB.
-  Jangan naikkan di laptop 8 GB; di CI 16 GB boleh `CARGO_BUILD_JOBS=4`.
-  Contoh: `CARGO_BUILD_JOBS=2 docker compose --profile traffic --profile obs --profile payslo up -d --build`.
-- Beri Docker Desktop/Colima ≥ 6 GB bila build + stack jalan bersamaan.
-- CI memakai `Swatinem/rust-cache` (cargo) + `cache-from/to: type=gha`
-  (lapisan Docker) agar build incremental.
-
-## Profil compose
-
-| Profil | Isi | Perintah |
-|---|---|---|
-| (default) | postgres, gateway-api, 3× bank-sim, merchant-sink, envoy | selalu ikut |
-| traffic | loadgen (k6) | `make up-lite` |
-| obs | prometheus, alertmanager, sql-exporter, grafana | `make up-lite` |
-| obs-full | loki, tempo, alloy | `make up-obs-full` / `make up` |
-| payslo | payslo, datadog-mock, ntfy | `make up-lite` |
-
-- `make up-lite` = default+traffic+obs+payslo (build lokal).
-- `make up-prebuilt` = sama, image GHCR ber-tag versi (tanpa build).
-- `make up` = semua profil. Semua service punya healthcheck (kecuali envoy,
-  ntfy, payslo — image tanpa shell; kesiapan dicek via HTTP oleh smoke) dan
-  `depends_on` yang relevan. Semua port host `127.0.0.1`.
-- `make reset` = `down -v` + `up-lite` (data sintetis dibuat ulang).
-  Idempotent: `make up-lite` dua kali tidak error.
-
-## Perintah utama
+The screenshot shows Mission Control from `lab serve --demo` in the dark theme. Full-page snapshots for
+both themes are stored in `ui/e2e/visual.spec.ts-snapshots/`.
 
 ```sh
-make help       # semua target
-make build      # cargo build --workspace
-make lint       # fmt --check + clippy -D warnings
-make test       # cargo test --workspace
-make deny       # cargo deny check
-make status     # status container
-make open       # daftar URL
-make smoke      # pipeline penuh FASE 8 (~75 mnt)
-make e2e        # cek dasar cepat (~30 dtk)
+make ui-install   # npm ci with exact pins
+make ui-dev       # Vite on :5173 (use --dev-proxy for the API)
+make ui-build     # tsc + vite -> ui/dist, then copy into the Go embed directory
+make ui-test      # tsc + eslint + vitest + prettier check
+make ui-e2e       # Playwright against lab serve --demo (axe, a11y, visual, security)
+make ui-audit     # npm audit, licenses, bundle budget, gofmt, go vet
+make ui-perf      # bundle budget and FCP/DCL (set PERF_SOAK_SECONDS for the SSE soak)
+make serve        # live API and embedded UI on :8088
+make serve-demo   # deterministic fixtures, no Docker required
 ```
 
-## Lab Console (U0–U8)
+Available pages: **Mission Control**, Architecture Map, **Payments**, **Chaos and Control**,
+**SLO Center**, **Incidents**, **Mentor** (PIN protected), **Learn** (curriculum), **Observability**
+(Grafana, Prometheus, Alertmanager, ntfy), and **Settings and Diagnostics**. Remaining routes are
+placeholders.
 
-Dashboard web lokal di `127.0.0.1:8088` (Go `lab serve` + React embed):
+The trainee interacts only with `lab serve`. Mutations require `X-Lab-Token` and `X-Lab-Actor` and are
+recorded in the append-only audit log `payslo-workspace/lab-audit.jsonl`. Live SLO operations require
+`DD_API_KEY=lab-only-dd-api-key` on the host (`make serve`) for the datadog-mock connection.
 
-![Lab Console — Mission Control](docs/images/lab-console.png)
+Accessibility work from U8 includes full keyboard operation, `aria-live` regions for incidents and
+approvals, `prefers-reduced-motion` support, and no horizontal overflow at 200% zoom.
 
-> Tangkapan layar Mission Control (`lab serve --demo`, tema gelap). Snapshot
-> lengkap semua halaman (2 tema) ada di `ui/e2e/visual.spec.ts-snapshots/`.
+UI quality gates run in CI (`.github/workflows/ci.yml`) and locally: strict `tsc --noEmit`, ESLint
+(with `jsx-a11y` and a ban on hardcoded strings), Prettier, Vitest (at least 80% coverage of core
+logic), Playwright (accessibility and axe, visual regression, compatibility, security), `npm audit`
+with license checks (`ui/scripts/check-licenses.mjs`), and a bundle budget
+(`ui/scripts/check-bundle.mjs`: initial JavaScript at most 350 KB gzip). Measured values (bundle size,
+FCP/DCL, one-hour SSE soak, axe matrix) are recorded in [docs/UI-SPEC.md](docs/UI-SPEC.md).
 
-```sh
-make ui-install   # npm ci (pin eksak)
-make ui-dev       # Vite :5173 (dengan --dev-proxy untuk API)
-make ui-build     # tsc + vite -> ui/dist (+ salin ke embed Go)
-make ui-test      # tsc + eslint + vitest + prettier-check
-make ui-e2e       # Playwright vs lab serve --demo (axe + a11y + visual + keamanan)
-make ui-audit     # npm audit + lisensi + anggaran bundle + gofmt/go vet
-make ui-perf      # anggaran bundle + FCP/DCL (PERF_SOAK_SECONDS untuk soak SSE)
-make serve        # API live + UI embed di :8088
-make serve-demo   # fixture deterministik, tanpa Docker
-```
-
-Halaman: **Mission Control**, Peta Arsitektur, **Pembayaran**, **Chaos & Kontrol**,
-**SLO Center**, **Insiden**, **Mentor** (PIN), **Belajar** (kurikulum), **Observability**
-(Grafana/Prometheus/Alertmanager/ntfy), **Pengaturan & Diagnostik**. Sisanya placeholder.
-Trainee hanya bicara ke `lab serve`; mutasi butuh `X-Lab-Token` + `X-Lab-Actor` dan
-tercatat di `payslo-workspace/lab-audit.jsonl` (append-only). Operasi SLO live butuh
-`DD_API_KEY=lab-only-dd-api-key` di host (`make serve`) untuk koneksi datadog-mock.
-Fitur aksesibilitas (U8): keyboard-only penuh, `aria-live` untuk insiden/approval,
-dukungan `prefers-reduced-motion`, dan zoom 200% tanpa overflow.
-
-Standar kualitas UI (U8) diverifikasi di CI (`.github/workflows/ci.yml`) dan lokal:
-`tsc --noEmit` strict, ESLint (jsx-a11y + larangan string hardcoded), Prettier, Vitest
-(coverage logika inti ≥ 80%), Playwright (a11y/axe, visual regression, kompatibilitas,
-keamanan), `npm audit` + pemeriksaan lisensi (`ui/scripts/check-licenses.mjs`), serta
-anggaran bundle (`ui/scripts/check-bundle.mjs`: JS initial ≤ 350 KB gzip).
-Angka hasil ukur (bundle, FCP/DCL, soak SSE 1 jam, matriks axe) ada di `docs/UI-SPEC.md`.
-
-Kontrak API: `api/openapi.yaml` (contract-first; tipe TS di-generate ke
-`ui/src/api/`). Spesifikasi UI: `docs/UI-SPEC.md`.
+The API contract lives in `api/openapi.yaml`. TypeScript types are generated into `ui/src/api/`. The UI
+specification is [docs/UI-SPEC.md](docs/UI-SPEC.md).
 
 ## PaySLO CLI
 
@@ -237,11 +173,11 @@ cargo run -p payslo-cli -- drift --workspace payslo-workspace
 cargo run -p payslo-cli -- capabilities
 ```
 
-Template di `payslo/templates/` (3 lab + 1 contoh produksi 30d, render-only).
-Koneksi di `payslo-workspace/connections.yml`. Matriks kapabilitas:
-`payslo/CAPABILITIES.md`.
+Templates are in `payslo/templates/` (three lab SLOs plus one production-style 30-day example that is
+render-only). Connection settings are in `payslo-workspace/connections.yml`. The capability matrix is
+in `payslo/CAPABILITIES.md`.
 
-## Lab trainee
+## Trainee workflow
 
 ```sh
 cargo run -p lab -- scenario list
@@ -253,37 +189,124 @@ cargo run -p lab -- verify 01
 cargo run -p lab -- scenario stop 01
 ```
 
-Kurikulum 5 hari: [curriculum/](curriculum/). Panduan mentor:
-[docs/mentor-guide.md](docs/mentor-guide.md). Bila macet:
-[docs/troubleshooting.md](docs/troubleshooting.md). Pin versi + cara upgrade:
-[docs/VERSIONS.md](docs/VERSIONS.md). Isu pemula:
+The five-day curriculum is in [curriculum/](curriculum/). The mentor guide is
+[docs/mentor-guide.md](docs/mentor-guide.md). If you get stuck, see
+[docs/troubleshooting.md](docs/troubleshooting.md). Version pins and upgrade procedures are in
+[docs/VERSIONS.md](docs/VERSIONS.md). Beginner-friendly issues are listed in
 [docs/GOOD_FIRST_ISSUES.md](docs/GOOD_FIRST_ISSUES.md).
 
-## FAQ
+## Resource requirements
 
-**Berapa lama smoke?** `make e2e` ~30 dtk. `make smoke` ~12-75 mnt
-(solver 8 mnt + menunggu burn 1h/10m reda; terukur 698 dtk pada 2026-10-15
-untuk periode buruk pendek, hingga ~1 jam untuk periode panjang).
+- Laptop with 4 CPUs and 8 GB RAM; Linux, macOS, or Windows with WSL2; amd64 and arm64.
+- The `up-lite` profile, measured on 2026-10-15 with `docker stats --no-stream` on arm64:
 
-**Verify PASS tapi insiden masih open?** Wajar: page alert reda dulu (~5-15 mnt),
-ticket 1h/10m terakhir (~1 jam). Lihat `docs/troubleshooting.md`.
+| Service | Memory used / limit |
+|---|---|
+| postgres | ~56 MB / 256 MB |
+| prometheus | ~58 MB / 256 MB |
+| grafana | ~73 MB / 256 MB |
+| envoy | ~17 MB / 128 MB |
+| sql-exporter | ~17 MB / 64 MB |
+| alertmanager | ~27 MB / 64 MB |
+| ntfy | ~14 MB / 64 MB |
+| loadgen (k6) | ~11 MB / 128 MB |
+| gateway-api | ~2 MB / 128 MB |
+| bank-sim (three instances) | ~1 MB / 64 MB each |
+| merchant-sink | ~2.5 MB / 64 MB |
+| payslo | ~1 MB / 128 MB |
+| datadog-mock | ~1 MB / 64 MB |
+| **Total for up-lite** | **~280 MB**, well below the 5 GB limit in principle P6 |
+| Additional `obs-full` services (Loki ~45 MB, Tempo up to 384 MB, Alloy) | ~200 MB when enabled |
 
-**`verify 01` PASS tanpa aksi?** Tidak seharusnya; bila terjadi dengan insiden
-lama, laporkan (draf isu no. 4 di `docs/GOOD_FIRST_ISSUES.md`).
+Static musl `scratch` images, measured on 2026-10-15 on arm64: gateway-api 14.5 MB, bank-sim 11.3 MB,
+merchant-sink 5.2 MB, payslo 19.3 MB, datadog-mock 5.4 MB. The upstream ntfy image is 118 MB.
 
-**Apple Silicon vs Intel?** Keduanya didukung (musl statis, buildx
-amd64+arm64). Ukuran image di atas diukur di arm64; amd64 seorde sama.
+## Build time and memory guidance
 
-**Data saya aman?** Semua sintetis. Jangan isi data asli. Lihat peringatan di atas.
+Measured on 2026-10-14 with Colima at 4 CPUs and 8 GB on arm64. The Dockerfile did not change in phase 8.
 
-**Boleh dipakai produksi?** TIDAK. Lihat peringatan paling atas.
+| Scenario | Time |
+|---|---|
+| Clean build (cold cache, all musl release dependencies) | about 7 minutes |
+| Incremental build (one Rust file changed, Chef cache reused) | about 50 seconds |
+| No changes (full cache) | about 1 second |
 
-## Aturan main
+- The `Dockerfile` uses `cargo-chef` (planner, cacher, builder) with a single builder stage
+  (`cargo build --release --workspace`), followed by one runtime stage per binary.
+- `CARGO_BUILD_JOBS=2` is set in the `Dockerfile` to avoid out-of-memory failures on 8 GB machines.
+  Do not raise it on an 8 GB laptop. On a 16 GB CI runner, `CARGO_BUILD_JOBS=4` is acceptable.
+  Example: `CARGO_BUILD_JOBS=2 docker compose --profile traffic --profile obs --profile payslo up -d --build`.
+- Provide at least 6 GB to Docker Desktop or Colima when the build and the stack run at the same time.
+- CI uses `Swatinem/rust-cache` for Cargo and `cache-from`/`cache-to: type=gha` for Docker layers to
+  keep builds incremental.
 
-Baca `AGENTS.MD` (peran, tech stack, prinsip P1–P8) dan `CONTRIBUTING.md` (DCO sign-off).
-Keputusan desain: `docs/DECISIONS.md`. Asumsi belum terverifikasi: `docs/ASSUMPTIONS.md`.
-Changelog: `CHANGELOG.md`.
+## Compose profiles
 
-## Lisensi
+| Profile | Services | Command |
+|---|---|---|
+| default | postgres, gateway-api, three bank-sim instances, merchant-sink, envoy | always included |
+| traffic | loadgen (k6) | `make up-lite` |
+| obs | prometheus, alertmanager, sql-exporter, grafana | `make up-lite` |
+| obs-full | loki, tempo, alloy | `make up-obs-full` or `make up` |
+| payslo | payslo, datadog-mock, ntfy | `make up-lite` |
 
-Apache-2.0 — lihat `LICENSE`.
+- `make up-lite` starts default, traffic, obs, and payslo with a local build.
+- `make up-prebuilt` starts the same set from versioned GHCR images without building.
+- `make up` starts every profile. Every service has a health check except envoy, ntfy, and payslo,
+  whose images have no shell; smoke verifies their readiness over HTTP. All host ports are bound to
+  `127.0.0.1`.
+- `make reset` runs `down -v` followed by `up-lite`, recreating the synthetic data. All commands are
+  idempotent; running `make up-lite` twice does not fail.
+
+## Common commands
+
+```sh
+make help       # list all targets
+make build      # cargo build --workspace
+make lint       # fmt --check and clippy -D warnings
+make test       # cargo test --workspace
+make deny       # cargo deny check
+make status     # container status
+make open       # print service URLs
+make smoke      # full pipeline from phase 8 (~75 minutes)
+make e2e        # quick end-to-end check (~30 seconds)
+```
+
+## Frequently asked questions
+
+**How long does smoke take?** `make e2e` takes about 30 seconds. `make smoke` takes approximately 12 to
+75 minutes: about 8 minutes for the solver plus the time needed for the 1h/10m burn rate to drain. It
+measured 698 seconds on 2026-10-15 for a short bad period, and up to about one hour for a long one.
+
+**Why does `verify` pass while the incident is still open?** This is expected. The page alert clears
+first (roughly 5 to 15 minutes), and the 1h/10m ticket alert clears last (about one hour). See
+[docs/troubleshooting.md](docs/troubleshooting.md).
+
+**Can `verify 01` pass without any action?** It should not. If it happens with an old incident, report
+it using draft issue 4 in [docs/GOOD_FIRST_ISSUES.md](docs/GOOD_FIRST_ISSUES.md).
+
+**Is Apple Silicon supported alongside Intel?** Both are supported through static musl builds and
+buildx for amd64 and arm64. Image sizes above were measured on arm64; amd64 is comparable.
+
+**Is my data safe?** All data is synthetic. Do not enter real data. See the warning at the top of this
+document.
+
+**Can this be used in production?** No. See the warning at the top of this document.
+
+## Documentation
+
+- [docs/RUNNING.md](docs/RUNNING.md): step-by-step local setup, from prerequisites to a completed scenario
+- [docs/UI-SPEC.md](docs/UI-SPEC.md): UI specification and measured U8 results
+- [docs/mentor-guide.md](docs/mentor-guide.md): mentor guide, including intentional lab flaws
+- [docs/troubleshooting.md](docs/troubleshooting.md): common failures and fixes
+- [docs/DECISIONS.md](docs/DECISIONS.md): design decisions and their rationale
+- [docs/ASSUMPTIONS.md](docs/ASSUMPTIONS.md): assumptions that still need verification
+- [docs/VERSIONS.md](docs/VERSIONS.md): pinned versions and upgrade procedures
+- [docs/BACKLOG.md](docs/BACKLOG.md): deferred work and known deviations
+- [CHANGELOG.md](CHANGELOG.md): release history
+- [CONTRIBUTING.md](CONTRIBUTING.md): contribution workflow and DCO sign-off
+- [AGENTS.MD](AGENTS.MD): roles, technology stack, and design principles P1 to P8
+
+## License
+
+Apache-2.0. See [LICENSE](LICENSE).
