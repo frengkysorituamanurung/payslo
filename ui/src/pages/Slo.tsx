@@ -23,14 +23,7 @@ import { TableScroll } from '../components/TableScroll';
 
 function Card({ title, children }: { title: string; children: React.ReactNode }) {
     return (
-        <section
-            aria-label={title}
-            style={{
-                border: '1px solid var(--border)',
-                borderRadius: 'var(--radius)',
-                padding: 16,
-            }}
-        >
+        <section aria-label={title} className="panel">
             <h2 style={{ marginTop: 0 }}>{title}</h2>
             {children}
         </section>
@@ -85,27 +78,14 @@ function SloListPanel({
                                 onSelect(s.name);
                             }}
                             aria-current={selected === s.name}
-                            style={{
-                                width: '100%',
-                                textAlign: 'start',
-                                background: selected === s.name ? 'var(--neutral-bg)' : undefined,
-                                border: '1px solid var(--border)',
-                                borderRadius: 'var(--radius)',
-                                padding: '8px 12px',
-                            }}
+                            className={selected === s.name ? 'list-item active' : 'list-item'}
                         >
                             <strong>{s.name}</strong>
-                            <span
-                                style={{
-                                    display: 'block',
-                                    color: 'var(--text-muted)',
-                                    fontSize: 12,
-                                }}
-                            >
-                                {s.service} · {t('slo.objectiveLabel')}{' '}
-                                {(s.objective * 100).toFixed(2)}% · {s.window}
+                            <span className="item-meta">
+                                {s.service}, {t('slo.objectiveLabel')}{' '}
+                                {(s.objective * 100).toFixed(2)}%, {s.window}
                                 {s.parseError !== undefined && s.parseError !== ''
-                                    ? ` · ⚠ ${s.parseError}`
+                                    ? `, ${s.parseError}`
                                     : ''}
                             </span>
                         </button>
@@ -231,7 +211,7 @@ function SloDetailPanel({ detail }: { detail: SloDetail }) {
                     <ul>
                         {detail.alerts.map((a, i) => (
                             <li key={`a${a.alert}-${String(i)}`}>
-                                {a.state === 'firing' ? '✕' : '!'} {a.alert} · {a.severity} ·{' '}
+                                {a.state === 'firing' ? '✕' : '!'} {a.alert}, {a.severity},{' '}
                                 {a.window}
                             </li>
                         ))}
@@ -350,7 +330,7 @@ function SloEditPanel({ name, content }: { name: string; content: string }) {
                     <div style={{ marginTop: 12 }}>
                         {planResult.warnings.map((w, i) => (
                             <p key={i} role="note" style={{ color: 'var(--warn)' }}>
-                                ⚠ {w}
+                                {w}
                             </p>
                         ))}
                         {planResult.changes.length === 0 ? (
@@ -414,7 +394,7 @@ function SloEditPanel({ name, content }: { name: string; content: string }) {
                     </ul>
                     {applyResult.warnings.map((w, i) => (
                         <p key={i} role="note" style={{ color: 'var(--warn)' }}>
-                            ⚠ {w}
+                            {w}
                         </p>
                     ))}
                 </Card>
@@ -557,7 +537,7 @@ export function SloPage() {
     const detail = useSloDetail(selected);
 
     return (
-        <section aria-labelledby="slo-title">
+        <section className="page" aria-labelledby="slo-title">
             <h1 id="slo-title">{t('nav.slo')}</h1>
             <div className="split-layout">
                 <div style={{ display: 'grid', gap: 16 }}>

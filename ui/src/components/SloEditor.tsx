@@ -113,6 +113,7 @@ export function SloEditor({
                 </button>
                 <button
                     type="button"
+                    className="btn-primary"
                     onClick={() => {
                         onSave(value);
                     }}

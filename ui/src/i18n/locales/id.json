@@ -1,7 +1,9 @@
 {
   "app": {
     "title": "PaySLO Lab Console",
-    "tagline": "Dasbor lokal trainee & mentor"
+    "tagline": "Dasbor lokal trainee & mentor",
+    "brand": "PaySLO",
+    "subtitle": "Lab Console"
   },
   "nav": {
     "mission": "Mission Control",
@@ -14,7 +16,8 @@
     "observe": "Observability",
     "learn": "Belajar",
     "mentor": "Mentor",
-    "settings": "Pengaturan"
+    "settings": "Pengaturan",
+    "menu": "Menu"
   },
   "topbar": {
     "stackUp": "Stack up",
@@ -78,7 +81,14 @@
     "live": "Live",
     "reconnecting": "Terputus, mencoba lagi…",
     "ratio2xx": "Rasio 2xx",
-    "successRatio": "Rasio sukses pembayaran"
+    "successRatio": "Rasio sukses pembayaran",
+    "subtitle": "Sinyal edge dan ledger untuk lab pembayaran lokal.",
+    "edge": "Edge",
+    "ledger": "Ledger",
+    "trend": "15 menit terakhir",
+    "window5m": "5 menit terakhir",
+    "gapLabel": "Edge vs ledger",
+    "gapNote": "selisih pada jendela 5 menit"
   },
   "map": {
     "title": "Peta Arsitektur",
@@ -268,8 +278,8 @@
     "noDiff": "Tidak ada perbedaan.",
     "diffSummary": "{{added}} baris tambah, {{removed}} baris hapus.",
     "diffCaption": "Diff baris actual (backend) ke desired (SLO).",
-    "prometheus": "prometheus",
-    "datadog": "datadog"
+    "prometheus": "Prometheus",
+    "datadog": "Datadog"
   },
   "incident": {
     "listTitle": "Daftar insiden",
@@ -440,7 +450,7 @@
     "noAnnotations": "Belum ada anotasi pada rentang ini."
   },
   "settings": {
-    "generalTitle": "Pengaturan",
+    "generalTitle": "Preferensi",
     "traineeName": "Nama trainee",
     "traineeNameHint": "Nama dipakai sebagai identitas approver default.",
     "threshold": "Ambang data-sedikit (req/s)",
@@ -459,5 +469,11 @@
     "reportHint": "Bebas secret: hanya versi/koneksi/resource. Aman disalin ke mentor.",
     "copyReport": "Salin laporan diagnostik",
     "copied": "Disalin."
+  },
+  "navGroup": {
+    "run": "Operasi",
+    "reliability": "Keandalan",
+    "learn": "Latihan",
+    "system": "Sistem"
   }
 }

@@ -42,14 +42,7 @@ async function downloadReport(scenario: string, format: 'markdown' | 'json'): Pr
 
 function Card({ title, children }: { title: string; children: React.ReactNode }) {
     return (
-        <section
-            aria-label={title}
-            style={{
-                border: '1px solid var(--border)',
-                borderRadius: 'var(--radius)',
-                padding: 16,
-            }}
-        >
+        <section aria-label={title} className="panel">
             <h2 style={{ marginTop: 0 }}>{title}</h2>
             {children}
         </section>
@@ -426,7 +419,7 @@ export function MentorPage() {
     // Mode trainee: 403 (sesuai acceptance: UI tidak menampilkan menu + 403).
     if (session.data?.mode !== 'mentor') {
         return (
-            <section aria-labelledby="mentor-forbidden">
+            <section className="page" aria-labelledby="mentor-forbidden">
                 <h1 id="mentor-forbidden">{t('nav.mentor')}</h1>
                 <div
                     role="alert"
@@ -446,7 +439,7 @@ export function MentorPage() {
     }
 
     return (
-        <section aria-labelledby="mentor-title">
+        <section className="page" aria-labelledby="mentor-title">
             <h1 id="mentor-title">{t('nav.mentor')}</h1>
             <div style={{ display: 'grid', gap: 16, alignItems: 'start' }}>
                 <Card title={t('mentor.timelineTitle')}>

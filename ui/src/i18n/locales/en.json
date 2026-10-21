@@ -1,7 +1,9 @@
 {
   "app": {
     "title": "PaySLO Lab Console",
-    "tagline": "Local trainee & mentor dashboard"
+    "tagline": "Local trainee & mentor dashboard",
+    "brand": "PaySLO",
+    "subtitle": "Lab Console"
   },
   "nav": {
     "mission": "Mission Control",
@@ -14,7 +16,8 @@
     "observe": "Observability",
     "learn": "Learn",
     "mentor": "Mentor",
-    "settings": "Settings"
+    "settings": "Settings",
+    "menu": "Menu"
   },
   "topbar": {
     "stackUp": "Stack up",
@@ -78,7 +81,14 @@
     "live": "Live",
     "reconnecting": "Disconnected, retrying…",
     "ratio2xx": "2xx ratio",
-    "successRatio": "Payment success ratio"
+    "successRatio": "Payment success ratio",
+    "subtitle": "Edge and ledger signals for the local payment lab.",
+    "edge": "Edge",
+    "ledger": "Ledger",
+    "trend": "Last 15 minutes",
+    "window5m": "Last 5 minutes",
+    "gapLabel": "Edge vs ledger",
+    "gapNote": "gap over the last 5 minutes"
   },
   "map": {
     "title": "Architecture Map",
@@ -268,8 +278,8 @@
     "noDiff": "No differences.",
     "diffSummary": "{{added}} lines added, {{removed}} lines removed.",
     "diffCaption": "Line diff from actual (backend) to desired (SLO).",
-    "prometheus": "prometheus",
-    "datadog": "datadog"
+    "prometheus": "Prometheus",
+    "datadog": "Datadog"
   },
   "incident": {
     "listTitle": "Incident list",
@@ -440,7 +450,7 @@
     "noAnnotations": "No annotations in this range."
   },
   "settings": {
-    "generalTitle": "Settings",
+    "generalTitle": "Preferences",
     "traineeName": "Trainee name",
     "traineeNameHint": "Name is used as the default approver identity.",
     "threshold": "Low-sample threshold (req/s)",
@@ -459,5 +469,11 @@
     "reportHint": "Secret-free: versions/connections/resources only. Safe to paste to your mentor.",
     "copyReport": "Copy diagnostics report",
     "copied": "Copied."
+  },
+  "navGroup": {
+    "run": "Run",
+    "reliability": "Reliability",
+    "learn": "Practice",
+    "system": "System"
   }
 }

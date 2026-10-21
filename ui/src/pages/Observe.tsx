@@ -14,14 +14,7 @@ import { formatLocal, formatRelative } from '../utils/time';
 
 function Card({ title, children }: { title: string; children: React.ReactNode }) {
     return (
-        <section
-            aria-label={title}
-            style={{
-                border: '1px solid var(--border)',
-                borderRadius: 'var(--radius)',
-                padding: 16,
-            }}
-        >
+        <section aria-label={title} className="panel">
             <h2 style={{ marginTop: 0 }}>{title}</h2>
             {children}
         </section>
@@ -109,15 +102,17 @@ function GrafanaFrame({ src, title }: { src: string; title: string }) {
                     }}
                 />
             )}
-            <p style={{ marginBottom: 0 }}>
-                <a
-                    href={src.replace('&kiosk', '').replace('?kiosk', '')}
-                    target="_blank"
-                    rel="noreferrer"
-                >
-                    {t('observe.openNewTab')}
-                </a>
-            </p>
+            {state !== 'failed' && (
+                <p style={{ marginBottom: 0 }}>
+                    <a
+                        href={src.replace('&kiosk', '').replace('?kiosk', '')}
+                        target="_blank"
+                        rel="noreferrer"
+                    >
+                        {t('observe.openNewTab')}
+                    </a>
+                </p>
+            )}
         </div>
     );
 }
@@ -193,7 +188,7 @@ function PrometheusPanel() {
                                 }}
                             >
                                 <p style={{ margin: 0, fontWeight: 700 }}>
-                                    ✕ {a.labels['alertname'] ?? t('observe.unknownAlert')} ·{' '}
+                                    ✕ {a.labels['alertname'] ?? t('observe.unknownAlert')},{' '}
                                     {a.state}
                                 </p>
                                 <p style={{ margin: 0, color: 'var(--text-muted)', fontSize: 12 }}>
@@ -201,7 +196,7 @@ function PrometheusPanel() {
                                         .filter(([k]) => k !== 'alertname')
                                         .map(([k, v]) => `${k}=${v}`)
                                         .join(' ')}
-                                    {' · '}
+                                    {'; '}
                                     <time dateTime={a.activeAt} title={a.activeAt}>
                                         {formatRelative(a.activeAt, i18n.language)}
                                     </time>
@@ -261,7 +256,7 @@ function AlertmanagerPanel() {
                 >
                     <p style={{ margin: 0, fontWeight: 700 }}>
                         {a.state === 'active' ? '✕' : '✓'}{' '}
-                        {a.labels['alertname'] ?? t('observe.unknownAlert')} · {a.state}
+                        {a.labels['alertname'] ?? t('observe.unknownAlert')}, {a.state}
                     </p>
                 </li>
             ))}
@@ -314,7 +309,11 @@ function AnnotationsPanel() {
         <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'grid', gap: 6 }}>
             {annotations.data.map((a) => (
                 <li key={a.id} style={{ display: 'flex', gap: 8 }}>
-                    <span aria-hidden="true">📌</span>
+                    <span
+                        className="live-dot"
+                        aria-hidden="true"
+                        style={{ marginTop: 6, flex: '0 0 auto' }}
+                    />
                     <div>
                         <span>{a.text}</span>{' '}
                         <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>
@@ -345,7 +344,7 @@ export function ObservePage() {
         status.data.services.find((s) => s.name === 'loki')?.reachable === false;
 
     return (
-        <section aria-labelledby="observe-title">
+        <section className="page" aria-labelledby="observe-title">
             <h1 id="observe-title">{t('nav.observe')}</h1>
             {(lokiDown || !obsFull) && status.isSuccess && (
                 <div
@@ -358,7 +357,7 @@ export function ObservePage() {
                     }}
                 >
                     <p style={{ marginTop: 0 }}>
-                        <strong>⏱ {t('observe.obsFullOff')}</strong>
+                        <strong>{t('observe.obsFullOff')}</strong>
                     </p>
                     <p style={{ marginBottom: 0, color: 'var(--text-muted)', fontSize: 12 }}>
                         {t('observe.obsFullOffHint')}

@@ -22,14 +22,7 @@ import { EmptyState, ErrorState } from '../components/States';
 
 function Card({ title, children }: { title: string; children: React.ReactNode }) {
     return (
-        <section
-            aria-label={title}
-            style={{
-                border: '1px solid var(--border)',
-                borderRadius: 'var(--radius)',
-                padding: 16,
-            }}
-        >
+        <section aria-label={title} className="panel">
             <h2 style={{ marginTop: 0 }}>{title}</h2>
             {children}
         </section>
@@ -143,7 +136,7 @@ function AlertsPanel({ detail }: { detail: IncidentDetail }) {
                     }}
                 >
                     <p style={{ margin: 0, fontWeight: 700 }}>
-                        {a.status === 'firing' ? '✕' : '✓'} {a.source} · {a.severity} · {a.status}
+                        {a.status === 'firing' ? '✕' : '✓'} {a.source}, {a.severity}, {a.status}
                     </p>
                     <PayloadValue value={a.payload} />
                 </li>
@@ -298,6 +291,7 @@ function ApprovalCard({ incidentId, step }: { incidentId: string; step: RunbookS
                         setConfirmApprove(true);
                     }}
                     disabled={decide.isPending || name.trim() === ''}
+                    className="btn-primary"
                 >
                     {t('incident.approve')}
                 </button>
@@ -317,6 +311,7 @@ function ApprovalCard({ incidentId, step }: { incidentId: string; step: RunbookS
                         });
                     }}
                     disabled={decide.isPending || name.trim() === ''}
+                    className="btn-danger"
                 >
                     {t('incident.reject')}
                 </button>
@@ -569,6 +564,7 @@ function SettingsPanel() {
                     </label>
                     <button
                         type="button"
+                        className="btn-primary"
                         onClick={() => {
                             save.mutate(
                                 { traineeName: shown.trim() },
@@ -605,7 +601,7 @@ export function IncidentsPage() {
     const items = (list.data ?? []).filter((i) => statusFilter === '' || i.status === statusFilter);
 
     return (
-        <section aria-labelledby="incidents-title">
+        <section className="page" aria-labelledby="incidents-title">
             <h1 id="incidents-title">{t('nav.incidents')}</h1>
             <div className="split-layout">
                 <div style={{ display: 'grid', gap: 16 }}>
@@ -645,30 +641,18 @@ export function IncidentsPage() {
                                             setSelected(i.id);
                                         }}
                                         aria-current={selected === i.id}
-                                        style={{
-                                            width: '100%',
-                                            textAlign: 'start',
-                                            background:
-                                                selected === i.id ? 'var(--neutral-bg)' : undefined,
-                                            border: '1px solid var(--border)',
-                                            borderRadius: 'var(--radius)',
-                                            padding: '8px 12px',
-                                        }}
+                                        className={
+                                            selected === i.id ? 'list-item active' : 'list-item'
+                                        }
                                     >
                                         <strong>{i.title}</strong>
-                                        <span
-                                            style={{
-                                                display: 'block',
-                                                fontSize: 12,
-                                                color: 'var(--text-muted)',
-                                            }}
-                                        >
-                                            {i.slo} · {i.service} · {i.severity} ·{' '}
+                                        <span className="item-meta">
+                                            {i.slo}, {i.service}, {i.severity},{' '}
                                             <time dateTime={i.createdAt} title={i.createdAt}>
                                                 {formatRelative(i.createdAt, i18n.language)}
                                             </time>
                                         </span>
-                                        <span style={{ display: 'block', marginTop: 4 }}>
+                                        <span className="item-state">
                                             <IncidentBadge status={i.status} />
                                         </span>
                                     </button>
