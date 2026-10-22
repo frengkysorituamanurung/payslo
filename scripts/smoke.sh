@@ -41,6 +41,35 @@ step() {
   step_t0=$now
 }
 fail() { echo "smoke FAIL: $1" >&2; exit 1; }
+
+# Diagnostik SLO:cetak rasio error, status alert Prometheus/Alertmanager, dan
+# incident PaySLO. Dipakai saat timeout supaya kegagalan bisa ditelusuri tanpa
+# harus reproduce manual.
+dump_slo_diag() {
+  echo "smoke: --- diagnostik SLO ---"
+  for w in 1m 5m 10m 15m 1h; do
+    v="$(curl -sfG --data-urlencode "query=payslo:slo_error_ratio:payment_success_rate:$w" \
+      http://127.0.0.1:9090/api/v1/query 2>/dev/null \
+      | python3 -c 'import json,sys
+r=json.load(sys.stdin)["data"]["result"]
+print(r[0]["value"][1] if r else "n/a")' 2>/dev/null || true)"
+    echo "smoke: error ratio ${w} = ${v:-n/a}"
+  done
+  echo "smoke: alert prometheus:"
+  curl -sf http://127.0.0.1:9090/api/v1/alerts 2>/dev/null \
+    | python3 -c 'import json,sys
+for a in json.load(sys.stdin)["data"]["alerts"]:
+    print("  ", a["labels"].get("slo"), a["labels"].get("window"), a["state"])' 2>/dev/null || true
+  echo "smoke: alert alertmanager:"
+  curl -sf http://127.0.0.1:9093/api/v2/alerts 2>/dev/null \
+    | python3 -c 'import json,sys
+for a in json.load(sys.stdin):
+    print("  ", a["labels"].get("slo"), a["labels"].get("window"), a["status"]["state"])' 2>/dev/null || true
+  echo "smoke: incident payslo:"
+  curl -sf http://127.0.0.1:8081/incidents 2>/dev/null || true
+  echo
+  echo "smoke: --- akhir diagnostik ---"
+}
 need() { command -v "$1" >/dev/null 2>&1 || fail "missing required tool: $1"; }
 
 # Bersihkan server console (lab serve) bila start saat skrip keluar lebih awal.
@@ -120,15 +149,18 @@ while ! curl -sf --max-time 2 http://127.0.0.1:8088/ >/dev/null 2>&1; do
   [ "$(date +%s)" -gt "$serve_deadline" ] && { cat /tmp/labserve-smoke.log >&2; fail "labserve timeout up"; }
   sleep 1
 done
-PAGE="$(curl -sf http://127.0.0.1:8088/)"
+PAGE="$(curl -sf --max-time 10 http://127.0.0.1:8088/)"
 TOKEN="$(printf '%s' "$PAGE" | sed -n 's/.*window.__LAB_TOKEN__="\([^"]*\)".*/\1/p' | head -1)"
 [ -n "$TOKEN" ] || fail "token tidak disuntikkan ke halaman console"
-code_no="$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 -X PUT \
+# SetTraffic menjalankan `docker compose up -d loadgen`; di runner CI yang
+# sibuk ini bisa >10 dtk. Timeout curl tidak boleh membunuh skrip (exit 28);
+# kode 000 akan gagal dengan pesan eksplisit di bawah.
+code_no="$(curl -s -o /dev/null -w '%{http_code}' --max-time 60 -X PUT \
   -H "Origin: http://127.0.0.1:8088" -H "Content-Type: application/json" \
-  --data '{"ratePerSec":5,"source":"loadgen"}' http://127.0.0.1:8088/api/v1/traffic)"
-code_yes="$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 -X PUT \
+  --data '{"ratePerSec":5,"source":"loadgen"}' http://127.0.0.1:8088/api/v1/traffic || true)"
+code_yes="$(curl -s -o /dev/null -w '%{http_code}' --max-time 60 -X PUT \
   -H "Origin: http://127.0.0.1:8088" -H "X-Lab-Token: $TOKEN" -H "Content-Type: application/json" \
-  --data '{"ratePerSec":5,"source":"loadgen"}' http://127.0.0.1:8088/api/v1/traffic)"
+  --data '{"ratePerSec":5,"source":"loadgen"}' http://127.0.0.1:8088/api/v1/traffic || true)"
 kill "$SERVE_PID" 2>/dev/null || true; SERVE_PID=""
 echo "smoke: lab serve tanpa token=$code_no, dengan token=$code_yes"
 [ "$code_no" = "403" ] || fail "mutasi tanpa token harus 403 (dapat $code_no)"
@@ -169,30 +201,40 @@ if [ ! -x "$LAB_BIN" ]; then
   echo "smoke: build lab CLI dulu"
   cargo build -p lab || fail "cargo build -p lab gagal"
 fi
-# Batas bawah created_at insiden: hanya insiden dari run ini yang diakui
-# (verify 01 menerima insiden lama yang sudah resolved).
+# Batas bawah resolved_at insiden: hanya insiden yang REDA di run ini yang
+# diakui (verify 01 menerima insiden lama yang sudah resolved; reopen
+# mempertahankan created_at lama, jadi created_at tidak bisa dipakai).
 SOLVER_T0=$(python3 -c "import datetime; print((datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(seconds=60)).strftime('%Y-%m-%dT%H:%M:%SZ'))")
 LAB_BIN="$LAB_BIN" bash scenarios/01/solve.sh || fail "solver skenario 01 gagal (verify tidak PASS)"
 
 # --- 6. incident + notifikasi + pemulihan --------------------------------------
 # Pemulihan penuh (incident resolved) mengikuti burn paling lambat 1h/10m:
 # empiris FASE 8: ~10 mnt (periode buruk pendek) hingga ~57 mnt (periode
-# buruk panjang). Poll hingga 65 mnt.
-step 6 "tunggu pemulihan + verifikasi incident/notifikasi (deadline 3900s)"
-deadline=$(( $(date +%s) + 3900 ))
+# buruk panjang). Poll hingga 75 mnt (batas bawah CI agar tidak flapping di
+# runner lambat; job CI punya timeout 120 mnt).
+step 6 "tunggu pemulihan + verifikasi incident/notifikasi (deadline 4500s)"
+deadline=$(( $(date +%s) + 4500 ))
+poll=0
 while :; do
   INC_JSON=$(curl -sf http://127.0.0.1:8081/incidents) || fail "payslo /incidents tidak terbaca"
   if echo "$INC_JSON" | SOLVER_T0="$SOLVER_T0" python3 -c "
 import json,sys,os
 t0 = os.environ['SOLVER_T0']
 incs = json.load(sys.stdin)['incidents']
-rec = [i for i in incs if i.get('slo') == 'payment-success-rate' and i.get('created_at','') >= t0 and i.get('resolved_at')]
+rec = [i for i in incs if i.get('slo') == 'payment-success-rate' and i.get('resolvedAt') and i.get('resolvedAt','') >= t0]
 sys.exit(0 if rec else 1)
 "; then
     echo "smoke: incident run ini resolved"
     break
   fi
-  [ "$(date +%s)" -gt "$deadline" ] && fail "timeout menunggu incident resolved (slow burn belum reda)"
+  poll=$((poll + 1))
+  if [ $((poll % 10)) -eq 0 ]; then
+    dump_slo_diag
+  fi
+  if [ "$(date +%s)" -gt "$deadline" ]; then
+    dump_slo_diag
+    fail "timeout menunggu incident resolved (slow burn belum reda)"
+  fi
   echo "smoke: incident belum resolved, tunggu 30s..."
   sleep 30
 done
@@ -200,14 +242,14 @@ echo "$INC_JSON" | SOLVER_T0="$SOLVER_T0" python3 -c "
 import json,sys,os
 t0 = os.environ['SOLVER_T0']
 incs = json.load(sys.stdin)['incidents']
-rec = [i for i in incs if i.get('slo') == 'payment-success-rate' and i.get('created_at','') >= t0 and i.get('resolved_at')]
-print('incident ok:', rec[0]['id'], 'resolved_at=', rec[0]['resolved_at'])
+rec = [i for i in incs if i.get('slo') == 'payment-success-rate' and i.get('resolvedAt') and i.get('resolvedAt','') >= t0]
+print('incident ok:', rec[0]['id'], 'resolved_at=', rec[0]['resolvedAt'])
 " || fail "assertion incident gagal"
 INC_ID=$(echo "$INC_JSON" | SOLVER_T0="$SOLVER_T0" python3 -c "
 import json,sys,os
 t0 = os.environ['SOLVER_T0']
 incs = json.load(sys.stdin)['incidents']
-rec = [i for i in incs if i.get('slo') == 'payment-success-rate' and i.get('created_at','') >= t0 and i.get('resolved_at')]
+rec = [i for i in incs if i.get('slo') == 'payment-success-rate' and i.get('resolvedAt') and i.get('resolvedAt','') >= t0]
 print(rec[0]['id'])")
 # Notifikasi: pesan ntfy untuk incident tersebut harus ada di cache topik.
 # Catatan: endpoint /json ntfy adalah stream yang tidak pernah selesai sendiri,

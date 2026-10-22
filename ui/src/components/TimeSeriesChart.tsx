@@ -39,20 +39,27 @@ export function TimeSeriesChart({
 
     useEffect(() => {
         if (ref.current === null || showTable || noCanvas) return;
-        const dark = document.documentElement.dataset['theme'] === 'dark';
-        const fg = dark ? '#f9fafb' : '#111827';
-        const grid = dark ? '#374151' : '#e5e7eb';
+        const css = getComputedStyle(document.documentElement);
+        const fg = css.getPropertyValue('--text').trim() || '#111827';
+        const grid = css.getPropertyValue('--border').trim() || '#e5e7eb';
+        const accent = css.getPropertyValue('--accent').trim() || '#0d5b49';
         const opts: uPlot.Options = {
             width: ref.current.clientWidth || 600,
             height,
-            series: [{}, { stroke: dark ? '#93c5fd' : '#1d4ed8', width: 2, spanGaps: false }],
+            legend: { show: false },
+            series: [{}, { stroke: accent, width: 2, spanGaps: false }],
             axes: [
                 {
                     stroke: fg,
+                    font: '11px "IBM Plex Sans", sans-serif',
                     grid: { stroke: grid },
                     values: (_u, vals) => vals.map((v) => new Date(v * 1000).toLocaleTimeString()),
                 },
-                { stroke: fg, grid: { stroke: grid } },
+                {
+                    stroke: fg,
+                    font: '11px "IBM Plex Sans", sans-serif',
+                    grid: { stroke: grid },
+                },
             ],
         };
         plot.current = new uPlot(opts, [xs, ys] as uPlot.AlignedData, ref.current);
@@ -72,6 +79,7 @@ export function TimeSeriesChart({
         <div>
             <button
                 type="button"
+                className="chart-toggle"
                 onClick={() => {
                     setShowTable((v) => !v);
                 }}

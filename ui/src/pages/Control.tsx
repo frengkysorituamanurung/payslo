@@ -30,14 +30,7 @@ function TrafficPanel({ ask }: { ask: (target: string, run: () => void) => void 
     const current = traffic.data?.ratePerSec;
 
     return (
-        <section
-            aria-labelledby="control-traffic-title"
-            style={{
-                border: '1px solid var(--border)',
-                borderRadius: 'var(--radius)',
-                padding: 16,
-            }}
-        >
+        <section aria-labelledby="control-traffic-title" className="panel">
             <h2 id="control-traffic-title">{t('control.trafficTitle')}</h2>
             <p>
                 {t('control.currentRate')}:{' '}
@@ -65,6 +58,7 @@ function TrafficPanel({ ask }: { ask: (target: string, run: () => void) => void 
             <div style={{ marginTop: 8 }}>
                 <button
                     type="button"
+                    className="btn-primary"
                     onClick={() => {
                         const n = Number(rate);
                         if (!Number.isInteger(n) || n < 1 || n > 100) {
@@ -119,14 +113,7 @@ function RoutingPanel({ ask }: { ask: (target: string, run: () => void) => void 
     }
 
     return (
-        <section
-            aria-labelledby="control-routing-title"
-            style={{
-                border: '1px solid var(--border)',
-                borderRadius: 'var(--radius)',
-                padding: 16,
-            }}
-        >
+        <section aria-labelledby="control-routing-title" className="panel">
             <h2 id="control-routing-title">{t('control.routingTitle')}</h2>
             <TableScroll label={t('control.routingTitle')}>
                 <table style={{ borderCollapse: 'collapse', width: '100%' }}>
@@ -172,6 +159,7 @@ function RoutingPanel({ ask }: { ask: (target: string, run: () => void) => void 
             <div style={{ marginTop: 8 }}>
                 <button
                     type="button"
+                    className="btn-primary"
                     onClick={() => {
                         if (
                             !validWeight(cfg.bca.weight) ||
@@ -211,14 +199,7 @@ function ReleasePanel({ ask }: { ask: (target: string, run: () => void) => void 
     const { t } = useTranslation();
     const setRelease = useSetRelease();
     return (
-        <section
-            aria-labelledby="control-release-title"
-            style={{
-                border: '1px solid var(--border)',
-                borderRadius: 'var(--radius)',
-                padding: 16,
-            }}
-        >
+        <section aria-labelledby="control-release-title" className="panel">
             <h2 id="control-release-title">{t('control.releaseTitle')}</h2>
             <p style={{ color: 'var(--text-muted)', fontSize: 12 }}>{t('control.releaseHint')}</p>
             <p>
@@ -323,7 +304,7 @@ export function ControlPage() {
     }
 
     return (
-        <section aria-labelledby="control-title">
+        <section className="page" aria-labelledby="control-title">
             <h1 id="control-title">{t('nav.control')}</h1>
             <p style={{ color: 'var(--text-muted)' }}>{t('control.intro')}</p>
 

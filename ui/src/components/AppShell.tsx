@@ -10,22 +10,52 @@ import { applyTheme, initialTheme } from '../utils/theme';
 import { StatusBadge } from './StatusBadge';
 import { CopyCommand } from './CopyCommand';
 
-const ROUTES = [
-    'mission',
-    'map',
-    'payments',
-    'slo',
-    'incidents',
-    'scenarios',
-    'control',
-    'observe',
-    'learn',
-    'mentor',
-    'settings',
-] as const;
+type RouteId =
+    | 'mission'
+    | 'payments'
+    | 'control'
+    | 'slo'
+    | 'incidents'
+    | 'observe'
+    | 'map'
+    | 'learn'
+    | 'scenarios'
+    | 'mentor'
+    | 'settings';
 
-function pathOf(r: (typeof ROUTES)[number]): string {
+const NAV_GROUPS: ReadonlyArray<{ key: string; routes: readonly RouteId[] }> = [
+    { key: 'run', routes: ['mission', 'payments', 'control'] },
+    { key: 'reliability', routes: ['slo', 'incidents', 'observe', 'map'] },
+    { key: 'learn', routes: ['learn', 'scenarios', 'mentor'] },
+    { key: 'system', routes: ['settings'] },
+];
+
+function pathOf(r: RouteId): string {
     return r === 'mission' ? '/' : `/${r}`;
+}
+
+function LockIcon() {
+    return (
+        <svg className="icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+            <rect
+                x="3.25"
+                y="7"
+                width="9.5"
+                height="6.5"
+                rx="1.5"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.4"
+            />
+            <path
+                d="M5.4 7V5.1a2.6 2.6 0 0 1 5.2 0V7"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.4"
+                strokeLinecap="round"
+            />
+        </svg>
+    );
 }
 
 // Dialog PIN mentor: pembatas spoiler (bukan keamanan). Dokumentasi jujur
@@ -38,30 +68,14 @@ function MentorUnlockDialog({ onClose }: { onClose: () => void }) {
 
     return (
         <div
+            className="dialog-backdrop"
             role="dialog"
             aria-modal="true"
             aria-label={t('mentor.unlockTitle')}
-            style={{
-                position: 'fixed',
-                inset: 0,
-                background: 'rgba(0,0,0,0.4)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                zIndex: 100,
-            }}
         >
-            <div
-                style={{
-                    background: 'var(--surface-raised)',
-                    border: '1px solid var(--border)',
-                    borderRadius: 'var(--radius)',
-                    padding: 24,
-                    minWidth: 320,
-                }}
-            >
-                <h2 style={{ marginTop: 0 }}>{t('mentor.unlockTitle')}</h2>
-                <p style={{ color: 'var(--text-muted)', fontSize: 12 }}>{t('mentor.unlockHint')}</p>
+            <div className="dialog">
+                <h2>{t('mentor.unlockTitle')}</h2>
+                <p className="dialog-hint">{t('mentor.unlockHint')}</p>
                 <form
                     onSubmit={(e) => {
                         e.preventDefault();
@@ -93,7 +107,7 @@ function MentorUnlockDialog({ onClose }: { onClose: () => void }) {
                             {error}
                         </p>
                     )}
-                    <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+                    <div className="dialog-actions">
                         <button type="submit" disabled={unlock.isPending || pin.trim() === ''}>
                             {unlock.isPending ? t('common.loading') : t('mentor.unlockButton')}
                         </button>
@@ -119,6 +133,7 @@ export function AppShell() {
     const pending = usePendingApprovals();
     const openPoll = useIncidents('open');
     const events = useEvents();
+    const [navOpen, setNavOpen] = useState(false);
 
     // U4: toast in-app untuk insiden/approval BARU. Acuan "sudah ada" adalah
     // snapshot query awal (bukan burst SSE pertama) agar reload/screenshot
@@ -196,64 +211,76 @@ export function AppShell() {
     const lock = useMentorLock();
 
     return (
-        <div style={{ display: 'flex', minHeight: '100vh' }}>
-            <nav
-                aria-label={t('app.title')}
-                style={{ width: 220, borderRight: '1px solid var(--border)', padding: 12 }}
-            >
-                <p style={{ fontWeight: 800, margin: '0 0 4px' }}>{t('app.title')}</p>
-                <p style={{ color: 'var(--text-muted)', fontSize: 12, margin: '0 0 12px' }}>
-                    {t('app.tagline')}
-                </p>
-                <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'grid', gap: 2 }}>
-                    {ROUTES.filter((r) => r !== 'mentor' || isMentor).map((r) => (
-                        <li key={r}>
-                            <NavLink
-                                to={pathOf(r)}
-                                style={({ isActive }) => ({
-                                    display: 'block',
-                                    padding: '6px 8px',
-                                    borderRadius: 'var(--radius)',
-                                    background: isActive ? 'var(--neutral-bg)' : undefined,
-                                })}
-                            >
-                                {t(`nav.${r}`)}
-                                {r === 'incidents' &&
-                                    pending.isSuccess &&
-                                    pending.data.length > 0 && (
-                                        <span
-                                            role="status"
-                                            aria-label={t('incident.approvalBadge', {
-                                                count: pending.data.length,
-                                            })}
-                                            style={{
-                                                marginLeft: 6,
-                                                background: 'var(--warn-bg)',
-                                                color: 'var(--warn)',
-                                                borderRadius: 'var(--radius)',
-                                                padding: '0 6px',
-                                                fontWeight: 700,
-                                            }}
-                                        >
-                                            {pending.data.length}
-                                        </span>
-                                    )}
-                            </NavLink>
-                        </li>
-                    ))}
-                </ul>
-            </nav>
-            <div style={{ flex: 1, minWidth: 0 }}>
-                <header
-                    style={{
-                        display: 'flex',
-                        gap: 12,
-                        alignItems: 'center',
-                        padding: '8px 16px',
-                        borderBottom: '1px solid var(--border)',
-                        flexWrap: 'wrap',
-                    }}
+        <div className="app">
+            <aside className="sidebar">
+                <div className="brand">
+                    <div>
+                        <p className="brand-name">{t('app.brand')}</p>
+                        <p className="brand-sub">{t('app.subtitle')}</p>
+                    </div>
+                    <button
+                        type="button"
+                        className="nav-toggle"
+                        aria-expanded={navOpen}
+                        aria-controls="app-nav"
+                        onClick={() => {
+                            setNavOpen((v) => !v);
+                        }}
+                    >
+                        {t('nav.menu')}
+                    </button>
+                </div>
+                <nav
+                    id="app-nav"
+                    className={navOpen ? 'sidebar-nav is-open' : 'sidebar-nav'}
+                    aria-label={t('app.title')}
                 >
+                    {NAV_GROUPS.map((group) => {
+                        const routes = group.routes.filter((r) => r !== 'mentor' || isMentor);
+                        if (routes.length === 0) return null;
+                        return (
+                            <div className="nav-group" key={group.key}>
+                                <p className="nav-label">{t(`navGroup.${group.key}`)}</p>
+                                <ul className="nav-list">
+                                    {routes.map((r) => (
+                                        <li key={r}>
+                                            <NavLink
+                                                to={pathOf(r)}
+                                                className={({ isActive }) =>
+                                                    isActive ? 'nav-link active' : 'nav-link'
+                                                }
+                                                onClick={() => {
+                                                    setNavOpen(false);
+                                                }}
+                                            >
+                                                <span>{t(`nav.${r}`)}</span>
+                                                {r === 'incidents' &&
+                                                    pending.isSuccess &&
+                                                    pending.data.length > 0 && (
+                                                        <span
+                                                            role="status"
+                                                            className="nav-count"
+                                                            aria-label={t(
+                                                                'incident.approvalBadge',
+                                                                {
+                                                                    count: pending.data.length,
+                                                                },
+                                                            )}
+                                                        >
+                                                            {pending.data.length}
+                                                        </span>
+                                                    )}
+                                            </NavLink>
+                                        </li>
+                                    ))}
+                                </ul>
+                            </div>
+                        );
+                    })}
+                </nav>
+            </aside>
+            <div className="content">
+                <header className="topbar">
                     {stack.isSuccess ? (
                         <StatusBadge
                             state={stackUp ? 'up' : 'down'}
@@ -263,17 +290,7 @@ export function AppShell() {
                         <StatusBadge state="unknown" />
                     )}
                     {session.isSuccess && (
-                        <span
-                            role="status"
-                            style={{
-                                fontWeight: 700,
-                                padding: '2px 10px',
-                                borderRadius: 'var(--radius)',
-                                background: isMentor ? 'var(--warn-bg)' : 'var(--neutral-bg)',
-                                color: isMentor ? 'var(--warn)' : 'var(--neutral)',
-                            }}
-                        >
-                            {isMentor ? '★ ' : ''}
+                        <span role="status" className={isMentor ? 'chip chip-warn' : 'chip'}>
                             {isMentor ? t('topbar.modeMentor') : t('topbar.modeTrainee')}
                         </span>
                     )}
@@ -291,7 +308,7 @@ export function AppShell() {
                             {t('mentor.exitMentor')}
                         </button>
                     )}
-                    <span style={{ flex: 1 }} />
+                    <span className="topbar-spacer" />
                     {!isMentor && (
                         <button
                             type="button"
@@ -300,11 +317,12 @@ export function AppShell() {
                             }}
                             aria-label={t('mentor.unlockButton')}
                         >
-                            🔒 {t('mentor.unlockButton')}
+                            <LockIcon />
+                            {t('mentor.unlockButton')}
                         </button>
                     )}
                     <label>
-                        {t('topbar.theme')}{' '}
+                        {t('topbar.theme')}
                         <select
                             data-testid="theme-select"
                             value={theme}
@@ -319,7 +337,7 @@ export function AppShell() {
                         </select>
                     </label>
                     <label>
-                        {t('topbar.language')}{' '}
+                        {t('topbar.language')}
                         <select
                             data-testid="lang-select"
                             value={i18n.language}
@@ -330,41 +348,23 @@ export function AppShell() {
                         </select>
                     </label>
                 </header>
-                <main style={{ padding: 16, maxWidth: 1280 }}>
+                <main className="main">
                     {showOnboarding ? (
-                        <section aria-labelledby="onboarding-title">
+                        <section className="page" aria-labelledby="onboarding-title">
                             <h1 id="onboarding-title">{t('onboarding.title')}</h1>
-                            <p>{t('onboarding.body')}</p>
-                            <CopyCommand command={t('onboarding.command')} />
+                            <div className="panel">
+                                <p>{t('onboarding.body')}</p>
+                                <CopyCommand command={t('onboarding.command')} />
+                            </div>
                         </section>
                     ) : (
                         <Outlet />
                     )}
                 </main>
             </div>
-            <div
-                aria-live="polite"
-                style={{
-                    position: 'fixed',
-                    right: 16,
-                    bottom: 16,
-                    display: 'grid',
-                    gap: 8,
-                    zIndex: 50,
-                }}
-            >
+            <div className="toast-region" aria-live="polite">
                 {toasts.map((toast) => (
-                    <div
-                        key={toast.id}
-                        role="status"
-                        style={{
-                            background: 'var(--surface-raised)',
-                            border: '1px solid var(--border)',
-                            borderRadius: 'var(--radius)',
-                            padding: '8px 12px',
-                            maxWidth: 360,
-                        }}
-                    >
+                    <div key={toast.id} role="status" className="toast">
                         {toast.text} <Link to={toast.to}>{t('nav.incidents')}</Link>
                     </div>
                 ))}

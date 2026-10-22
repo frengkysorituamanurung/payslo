@@ -50,9 +50,9 @@ spec:
       - alert: PaySLOBurnRateHigh
         expr: |
           (
-            payslo:slo_error_ratio:payment_success_rate:5m > 0.072
+            payslo:slo_error_ratio:payment_success_rate:5m > 0.144
             and
-            payslo:slo_error_ratio:payment_success_rate:1m > 0.072
+            payslo:slo_error_ratio:payment_success_rate:1m > 0.144
           )
         for: 1m
         labels:
@@ -66,9 +66,9 @@ spec:
       - alert: PaySLOBurnRateHigh
         expr: |
           (
-            payslo:slo_error_ratio:payment_success_rate:15m > 0.03
+            payslo:slo_error_ratio:payment_success_rate:15m > 0.06
             and
-            payslo:slo_error_ratio:payment_success_rate:5m > 0.03
+            payslo:slo_error_ratio:payment_success_rate:5m > 0.06
           )
         for: 5m
         labels:
@@ -82,9 +82,9 @@ spec:
       - alert: PaySLOBurnRateHigh
         expr: |
           (
-            payslo:slo_error_ratio:payment_success_rate:1h > 0.01
+            payslo:slo_error_ratio:payment_success_rate:1h > 0.02
             and
-            payslo:slo_error_ratio:payment_success_rate:10m > 0.01
+            payslo:slo_error_ratio:payment_success_rate:10m > 0.02
           )
         for: 10m
         labels:

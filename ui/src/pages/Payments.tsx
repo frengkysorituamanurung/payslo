@@ -56,7 +56,7 @@ function Field({
     children: ReactNode;
 }) {
     return (
-        <div>
+        <div className="field">
             <label htmlFor={id}>{label}</label>
             {children}
             {hint !== undefined && (
@@ -129,7 +129,12 @@ function PaymentFormPanel() {
     }
 
     return (
-        <form onSubmit={onSubmit} aria-labelledby="payments-form-title" noValidate>
+        <form
+            className="panel"
+            onSubmit={onSubmit}
+            aria-labelledby="payments-form-title"
+            noValidate
+        >
             <h2 id="payments-form-title">{t('payments.formTitle')}</h2>
             <div
                 style={{
@@ -253,14 +258,7 @@ function PaymentDetailPanel({ id, onClose }: { id: string; onClose: () => void }
     const p = detail.data.payment;
 
     return (
-        <section
-            aria-labelledby="payment-detail-title"
-            style={{
-                border: '1px solid var(--border)',
-                borderRadius: 'var(--radius)',
-                padding: 16,
-            }}
-        >
+        <section aria-labelledby="payment-detail-title" className="panel">
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <h2 id="payment-detail-title" style={{ margin: 0 }}>
                     {t('payments.detail')}
@@ -306,7 +304,7 @@ function PaymentDetailPanel({ id, onClose }: { id: string; onClose: () => void }
                 <strong>
                     {t('payments.callbackReceived', { count: detail.data.callbackCount })}
                 </strong>
-                {' · '}
+                <br />
                 <strong>
                     {t('payments.webhookDelivered', { count: detail.data.webhookCount })}
                 </strong>
@@ -376,12 +374,12 @@ export function PaymentsPage() {
     const items = list.data?.pages.flatMap((page) => page.items) ?? [];
 
     return (
-        <section aria-labelledby="payments-title">
+        <section className="page" aria-labelledby="payments-title">
             <h1 id="payments-title">{t('nav.payments')}</h1>
 
             <PaymentFormPanel />
 
-            <section aria-labelledby="payments-table-title">
+            <section className="panel" aria-labelledby="payments-table-title">
                 <h2 id="payments-table-title">{t('payments.table')}</h2>
                 <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 12 }}>
                     <label>

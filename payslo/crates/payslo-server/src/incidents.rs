@@ -42,8 +42,16 @@ pub fn correlate(
         .transaction()
         .map_err(|e| CorrelateError::Db(e.to_string()))?;
     let mut events = Vec::new();
+    // Pass 1: upsert semua alert lebih dulu. Satu webhook Alertmanager
+    // berisi beberapa window burn rate (5m/1m, 15m/5m, 1h/10m) dalam satu
+    // group. Kalau transisi diproses sambil insert, alert "resolved" bisa
+    // menutup incident sebelum alert "firing" lain di batch yang sama
+    // tercatat -> incident flapping (resolve lalu reopen).
     for (alert, fingerprint) in alerts {
         insert_alert(&tx, alert, fingerprint)?;
+    }
+    // Pass 2: transisi status (open/reopen/touch/resolve).
+    for (alert, fingerprint) in alerts {
         match alert.status {
             AlertStatus::Firing => {
                 if let Some(id) = open_incident(&tx, &alert.slo, &alert.service)? {
@@ -364,6 +372,35 @@ mod tests {
             .query_row("SELECT status FROM incidents", [], |r| r.get(0))
             .map_err(|e| e.to_string())?;
         assert_eq!(status, "resolved");
+        Ok(())
+    }
+
+    #[test]
+    fn batch_with_firing_alert_does_not_close_incident() -> Result<(), String> {
+        // Regression: satu webhook group berisi beberapa window burn rate.
+        // Alert resolved diproses sebelum alert firing lain di batch yang sama
+        // -> incident tertutup prematur lalu reopen (flapping).
+        let mut conn = memdb()?;
+        let firing = alert("s", "svc", AlertStatus::Firing);
+        correlate(&mut conn, std::slice::from_ref(&firing)).map_err(|e| e.to_string())?;
+        // Batch: resolved lebih dulu, lalu masih firing (window lain).
+        let resolved = (
+            CanonicalAlert {
+                status: AlertStatus::Resolved,
+                ..firing.0.clone()
+            },
+            format!("{}-resolved", firing.1),
+        );
+        let still_firing = (firing.0.clone(), format!("{}-firing", firing.1));
+        let events = correlate(&mut conn, &[resolved, still_firing]).map_err(|e| e.to_string())?;
+        assert!(
+            events.is_empty(),
+            "incident tidak boleh ditutup saat masih ada alert firing di batch yang sama"
+        );
+        let status: String = conn
+            .query_row("SELECT status FROM incidents", [], |r| r.get(0))
+            .map_err(|e| e.to_string())?;
+        assert_eq!(status, "open");
         Ok(())
     }
 

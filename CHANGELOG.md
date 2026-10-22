@@ -40,6 +40,17 @@ Tanggal dalam UTC.
 - `api/openapi.yaml` v0.5.0 (skema pembayaran/kontrol/audit + SLO + insiden)
   + tipe TS di-generate (`openapi-typescript`).
 
+### Changed
+- Lab Console: redesain visual "signal room / ledger instrument" —
+  tipografi IBM Plex Sans/Mono self-hosted, palet hijau-abu/petrol (terang)
+  dan near-black/mint (gelap), sidebar berkelompok, serta Mission Control
+  dengan readout HTTP edge vs ledger pembayaran + strip gap. Status tetap
+  ikon + teks; kontras token diuji. `@fontsource/inter` diganti
+  `@fontsource/ibm-plex-sans` dan `@fontsource/ibm-plex-mono` (5.3.0).
+- Visual regression `/observe` memaksa jalur fallback iframe agar snapshot
+  tidak bergantung pada waktu load Grafana; baseline darwin dan linux
+  diperbarui.
+
 ### Tests
 - Go: kontrak rute vs `openapi.yaml`, uji live `lab_ro` read-only
   (INSERT/UPDATE/DELETE ditolak), keamanan path editor (traversal, absolut,
@@ -60,6 +71,20 @@ Tanggal dalam UTC.
   resolved; workspace dikembalikan bersih).
 
 ### Fixed
+- CI: `cargo-deny-action` dinaikkan ke v2.1.1 (cargo-deny 0.20.2) agar
+  `cargo metadata` dari Cargo 1.97.1 dapat diparse; lockfile diperbarui untuk
+  RUSTSEC-2026-0381/0382/0383 (`webpki-roots`, `webpki-root-certs`,
+  `rustls-webpki`). Job `smoke` kini memasang Node 22 dan menjalankan
+  `npm ci` sebelum `make ui-build`, sehingga build UI tersemat tidak gagal
+  di runner bersih. Job `gitleaks` menerima `GITHUB_TOKEN` agar pemindaian
+  `pull_request` tidak berhenti dengan error token. Job `smoke` juga memakai
+  `actions/setup-go` + cache `cmd/lab/go.sum` agar tidak mengunduh toolchain Go
+  di tengah pipeline. Guard mutasi smoke memakai timeout 60 dtk dan `|| true`
+  agar timeout curl tidak menghentikan skrip dengan exit 28; kode `000`
+  dilaporkan sebagai kegagalan yang jelas.
+- Console `/observe`: state `failed` bersifat terminal; `onLoad` dari halaman
+  error iframe tidak lagi menimpa fallback. Ini menghilangkan race yang membuat
+  snapshot visual tema gelap flaky.
 - CLI `lab verify`: `Check::RoutingState` kini membaca listener **admin** gateway
   (`LAB_GATEWAY_ADMIN_URL`, `:3001`); sebelumnya keliru memakai listener publik
   (`:3000`) yang tidak melayani `/admin/*`, sehingga `verify 01` selalu gagal pada

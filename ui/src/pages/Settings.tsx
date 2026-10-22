@@ -9,14 +9,7 @@ import { TableScroll } from '../components/TableScroll';
 
 function Card({ title, children }: { title: string; children: React.ReactNode }) {
     return (
-        <section
-            aria-label={title}
-            style={{
-                border: '1px solid var(--border)',
-                borderRadius: 'var(--radius)',
-                padding: 16,
-            }}
-        >
+        <section aria-label={title} className="panel">
             <h2 style={{ marginTop: 0 }}>{title}</h2>
             {children}
         </section>
@@ -120,6 +113,7 @@ function SettingsForm() {
             <div>
                 <button
                     type="button"
+                    className="btn-primary"
                     disabled={save.isPending || !thresholdOK}
                     onClick={() => {
                         save.mutate(
@@ -187,7 +181,7 @@ function DiagnosticsPanel() {
             <h3>{t('settings.resources')}</h3>
             {!report.docker.available ? (
                 <p role="note" style={{ color: 'var(--text-muted)' }}>
-                    ⏱ {report.docker.note ?? t('settings.dockerUnavailable')}
+                    {report.docker.note ?? t('settings.dockerUnavailable')}
                 </p>
             ) : (
                 <TableScroll label={t('settings.resources')}>
@@ -261,7 +255,7 @@ function DiagnosticsPanel() {
 export function SettingsPage() {
     const { t } = useTranslation();
     return (
-        <section aria-labelledby="settings-title">
+        <section className="page" aria-labelledby="settings-title">
             <h1 id="settings-title">{t('nav.settings')}</h1>
             <div style={{ display: 'grid', gap: 16, alignItems: 'start' }}>
                 <Card title={t('settings.generalTitle')}>

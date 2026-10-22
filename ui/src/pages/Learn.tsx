@@ -12,14 +12,7 @@ import { EmptyState, ErrorState } from '../components/States';
 
 function Card({ title, children }: { title: string; children: React.ReactNode }) {
     return (
-        <section
-            aria-label={title}
-            style={{
-                border: '1px solid var(--border)',
-                borderRadius: 'var(--radius)',
-                padding: 16,
-            }}
-        >
+        <section aria-label={title} className="panel">
             <h2 style={{ marginTop: 0 }}>{title}</h2>
             {children}
         </section>
@@ -179,7 +172,7 @@ export function LearnPage() {
     if (curriculum.data.length === 0) return <EmptyState next={t('learn.empty')} />;
 
     return (
-        <section aria-labelledby="learn-title">
+        <section className="page" aria-labelledby="learn-title">
             <h1 id="learn-title">{t('nav.learn')}</h1>
             <p style={{ color: 'var(--text-muted)' }}>{t('learn.intro')}</p>
             <div style={{ display: 'grid', gap: 16, alignItems: 'start' }}>

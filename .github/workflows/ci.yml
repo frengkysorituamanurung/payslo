@@ -48,7 +48,7 @@ jobs:
         with:
           toolchain: 1.97.1
       - uses: Swatinem/rust-cache@v2.7.3
-      - uses: EmbarkStudios/cargo-deny-action@v2.0.9
+      - uses: EmbarkStudios/cargo-deny-action@v2.1.1
 
   audit:
     name: cargo-audit
@@ -216,6 +216,8 @@ jobs:
         with:
           fetch-depth: 0
       - uses: gitleaks/gitleaks-action@v2.3.9
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   docker:
     name: docker build (multi-arch, no push)
@@ -280,10 +282,21 @@ jobs:
     timeout-minutes: 120
     steps:
       - uses: actions/checkout@v4.2.2
+      - uses: actions/setup-node@v4.4.0
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: ui/package-lock.json
+      - uses: actions/setup-go@v5.5.0
+        with:
+          go-version-file: cmd/lab/go.mod
+          cache-dependency-path: cmd/lab/go.sum
       - uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: 1.97.1
       - uses: Swatinem/rust-cache@v2.7.3
+      - run: npm ci --no-audit --no-fund
+        working-directory: ui
       - name: Full smoke pipeline
         run: bash scripts/smoke.sh
       - name: "Idempotency: reset + up-lite kedua kali"
