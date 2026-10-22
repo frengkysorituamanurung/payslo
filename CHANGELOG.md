@@ -77,7 +77,9 @@ Tanggal dalam UTC.
   `rustls-webpki`). Job `smoke` kini memasang Node 22 dan menjalankan
   `npm ci` sebelum `make ui-build`, sehingga build UI tersemat tidak gagal
   di runner bersih. Job `gitleaks` menerima `GITHUB_TOKEN` agar pemindaian
-  `pull_request` tidak berhenti dengan error token.
+  `pull_request` tidak berhenti dengan error token. Job `smoke` juga memakai
+  `actions/setup-go` + cache `cmd/lab/go.sum` agar tidak mengunduh toolchain Go
+  di tengah pipeline.
 - Console `/observe`: state `failed` bersifat terminal; `onLoad` dari halaman
   error iframe tidak lagi menimpa fallback. Ini menghilangkan race yang membuat
   snapshot visual tema gelap flaky.

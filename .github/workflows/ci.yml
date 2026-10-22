@@ -287,6 +287,10 @@ jobs:
           node-version: '22'
           cache: npm
           cache-dependency-path: ui/package-lock.json
+      - uses: actions/setup-go@v5.5.0
+        with:
+          go-version-file: cmd/lab/go.mod
+          cache-dependency-path: cmd/lab/go.sum
       - uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: 1.97.1
