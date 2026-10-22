@@ -7,7 +7,13 @@ kind: SLO
 name: payment-success-rate
 service: gateway-api
 description: Share of payments reaching final SUCCESS across all channels.
-objective: 0.995
+# Objective 99% (bukan 99,5%): bank-sim "normal" sukses ~99,5% per provider dan
+# agregat lab ~99,2% (sisanya expiry/callback). Dengan objective 99,5% lab
+# permanen melanggar SLO -> slow-burn 15m/5m (threshold 3% error) dan
+# 1h/10m (threshold 1% error) tetap firing dan incident tidak pernah reda.
+# Dengan 99% error budget 1%: fast 5m/1m=14,4%, slow 15m/5m=6%, 1h/10m=2%
+# -> insiden bca-down (error ~60%) tetap memicu, kondisi normal tidak.
+objective: 0.99
 window: 1h
 sli:
   type: success-ratio
