@@ -221,7 +221,7 @@ while :; do
 import json,sys,os
 t0 = os.environ['SOLVER_T0']
 incs = json.load(sys.stdin)['incidents']
-rec = [i for i in incs if i.get('slo') == 'payment-success-rate' and i.get('resolved_at') and i.get('resolved_at','') >= t0]
+rec = [i for i in incs if i.get('slo') == 'payment-success-rate' and i.get('resolvedAt') and i.get('resolvedAt','') >= t0]
 sys.exit(0 if rec else 1)
 "; then
     echo "smoke: incident run ini resolved"
@@ -242,14 +242,14 @@ echo "$INC_JSON" | SOLVER_T0="$SOLVER_T0" python3 -c "
 import json,sys,os
 t0 = os.environ['SOLVER_T0']
 incs = json.load(sys.stdin)['incidents']
-rec = [i for i in incs if i.get('slo') == 'payment-success-rate' and i.get('resolved_at') and i.get('resolved_at','') >= t0]
-print('incident ok:', rec[0]['id'], 'resolved_at=', rec[0]['resolved_at'])
+rec = [i for i in incs if i.get('slo') == 'payment-success-rate' and i.get('resolvedAt') and i.get('resolvedAt','') >= t0]
+print('incident ok:', rec[0]['id'], 'resolved_at=', rec[0]['resolvedAt'])
 " || fail "assertion incident gagal"
 INC_ID=$(echo "$INC_JSON" | SOLVER_T0="$SOLVER_T0" python3 -c "
 import json,sys,os
 t0 = os.environ['SOLVER_T0']
 incs = json.load(sys.stdin)['incidents']
-rec = [i for i in incs if i.get('slo') == 'payment-success-rate' and i.get('resolved_at') and i.get('resolved_at','') >= t0]
+rec = [i for i in incs if i.get('slo') == 'payment-success-rate' and i.get('resolvedAt') and i.get('resolvedAt','') >= t0]
 print(rec[0]['id'])")
 # Notifikasi: pesan ntfy untuk incident tersebut harus ada di cache topik.
 # Catatan: endpoint /json ntfy adalah stream yang tidak pernah selesai sendiri,
