@@ -76,7 +76,8 @@ Tanggal dalam UTC.
   RUSTSEC-2026-0381/0382/0383 (`webpki-roots`, `webpki-root-certs`,
   `rustls-webpki`). Job `smoke` kini memasang Node 22 dan menjalankan
   `npm ci` sebelum `make ui-build`, sehingga build UI tersemat tidak gagal
-  di runner bersih.
+  di runner bersih. Job `gitleaks` menerima `GITHUB_TOKEN` agar pemindaian
+  `pull_request` tidak berhenti dengan error token.
 - CLI `lab verify`: `Check::RoutingState` kini membaca listener **admin** gateway
   (`LAB_GATEWAY_ADMIN_URL`, `:3001`); sebelumnya keliru memakai listener publik
   (`:3000`) yang tidak melayani `/admin/*`, sehingga `verify 01` selalu gagal pada
