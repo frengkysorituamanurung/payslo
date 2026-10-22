@@ -120,15 +120,18 @@ while ! curl -sf --max-time 2 http://127.0.0.1:8088/ >/dev/null 2>&1; do
   [ "$(date +%s)" -gt "$serve_deadline" ] && { cat /tmp/labserve-smoke.log >&2; fail "labserve timeout up"; }
   sleep 1
 done
-PAGE="$(curl -sf http://127.0.0.1:8088/)"
+PAGE="$(curl -sf --max-time 10 http://127.0.0.1:8088/)"
 TOKEN="$(printf '%s' "$PAGE" | sed -n 's/.*window.__LAB_TOKEN__="\([^"]*\)".*/\1/p' | head -1)"
 [ -n "$TOKEN" ] || fail "token tidak disuntikkan ke halaman console"
-code_no="$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 -X PUT \
+# SetTraffic menjalankan `docker compose up -d loadgen`; di runner CI yang
+# sibuk ini bisa >10 dtk. Timeout curl tidak boleh membunuh skrip (exit 28);
+# kode 000 akan gagal dengan pesan eksplisit di bawah.
+code_no="$(curl -s -o /dev/null -w '%{http_code}' --max-time 60 -X PUT \
   -H "Origin: http://127.0.0.1:8088" -H "Content-Type: application/json" \
-  --data '{"ratePerSec":5,"source":"loadgen"}' http://127.0.0.1:8088/api/v1/traffic)"
-code_yes="$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 -X PUT \
+  --data '{"ratePerSec":5,"source":"loadgen"}' http://127.0.0.1:8088/api/v1/traffic || true)"
+code_yes="$(curl -s -o /dev/null -w '%{http_code}' --max-time 60 -X PUT \
   -H "Origin: http://127.0.0.1:8088" -H "X-Lab-Token: $TOKEN" -H "Content-Type: application/json" \
-  --data '{"ratePerSec":5,"source":"loadgen"}' http://127.0.0.1:8088/api/v1/traffic)"
+  --data '{"ratePerSec":5,"source":"loadgen"}' http://127.0.0.1:8088/api/v1/traffic || true)"
 kill "$SERVE_PID" 2>/dev/null || true; SERVE_PID=""
 echo "smoke: lab serve tanpa token=$code_no, dengan token=$code_yes"
 [ "$code_no" = "403" ] || fail "mutasi tanpa token harus 403 (dapat $code_no)"

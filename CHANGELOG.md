@@ -79,7 +79,9 @@ Tanggal dalam UTC.
   di runner bersih. Job `gitleaks` menerima `GITHUB_TOKEN` agar pemindaian
   `pull_request` tidak berhenti dengan error token. Job `smoke` juga memakai
   `actions/setup-go` + cache `cmd/lab/go.sum` agar tidak mengunduh toolchain Go
-  di tengah pipeline.
+  di tengah pipeline. Guard mutasi smoke memakai timeout 60 dtk dan `|| true`
+  agar timeout curl tidak menghentikan skrip dengan exit 28; kode `000`
+  dilaporkan sebagai kegagalan yang jelas.
 - Console `/observe`: state `failed` bersifat terminal; `onLoad` dari halaman
   error iframe tidak lagi menimpa fallback. Ini menghilangkan race yang membuat
   snapshot visual tema gelap flaky.
