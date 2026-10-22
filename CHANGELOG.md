@@ -78,6 +78,9 @@ Tanggal dalam UTC.
   `npm ci` sebelum `make ui-build`, sehingga build UI tersemat tidak gagal
   di runner bersih. Job `gitleaks` menerima `GITHUB_TOKEN` agar pemindaian
   `pull_request` tidak berhenti dengan error token.
+- Console `/observe`: state `failed` bersifat terminal; `onLoad` dari halaman
+  error iframe tidak lagi menimpa fallback. Ini menghilangkan race yang membuat
+  snapshot visual tema gelap flaky.
 - CLI `lab verify`: `Check::RoutingState` kini membaca listener **admin** gateway
   (`LAB_GATEWAY_ADMIN_URL`, `:3001`); sebelumnya keliru memakai listener publik
   (`:3000`) yang tidak melayani `/admin/*`, sehingga `verify 01` selalu gagal pada

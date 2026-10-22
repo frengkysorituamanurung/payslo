@@ -36,6 +36,8 @@ function GrafanaFrame({ src, title }: { src: string; title: string }) {
     // sudah benar tanpa setState sinkron di effect. Probe fetch no-cors
     // menolak saat network gagal (onError iframe tidak andal; onLoad bisa
     // menyala untuk halaman error) -> fallback cepat dan pasti.
+    // 'failed' bersifat terminal: halaman error dapat memicu onLoad setelah
+    // probe menolak, dan itu tidak boleh menimpa fallback.
     useEffect(() => {
         let cancelled = false;
         void fetch(src, { mode: 'no-cors' }).then(
@@ -94,7 +96,7 @@ function GrafanaFrame({ src, title }: { src: string; title: string }) {
                     loading="lazy"
                     onLoad={() => {
                         if (timer.current !== null) window.clearTimeout(timer.current);
-                        setState('loaded');
+                        setState((prev) => (prev === 'failed' ? prev : 'loaded'));
                     }}
                     onError={() => {
                         if (timer.current !== null) window.clearTimeout(timer.current);
